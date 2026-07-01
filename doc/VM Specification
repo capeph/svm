@@ -1,0 +1,93 @@
+VM Specification
+
+64 bit variables / registers
+128 registers, identified by a single byte
+top bit in the register opcode tells if it is treated as a value or a reference
+
+a set of result flags:
+zero
+positive
+negative
+error
+
+
+each instruction is 32 bit wide.
+some instructions are followed by one or two data fields.
+if one field this is used as a 32 bit constant
+if two fields the seconds field are the high bits)
+
+the instruction is split into four parts:
+opcode (top 8 bits:  the actual instruction opcode
+mods  (bits 16-23):  modifiers to instruction
+target (bits 8-15):  the destination register
+data (bits 0-7) the source or data register
+
+mods are:
+const 7,6:  0 - no constant
+            1 - use 32 bit constant
+            2 - use 64 bit constant
+            3 - not used
+condition   0 - no condition
+            1 - execute if zero
+            2 - execute if positive
+            3 - execute if negative
+            4 - execute if error
+
+opcodes are:
+load        load the value from data into target
+            if const flag is used, the value from next instruction field(s) are loaded
+            into target instead. the PC in increased appropriately
+            error flag is set if data or target is outside of available space
+            positive, negative or zero is set based on the value
+ahead       use the value of the target and data together as a 16 bit offset to be added to the PC
+            error flag is set if target is outside of available space
+back        use the value of the target and data together as a 16 bit offset to be subtracted from the PC
+            error flag is set if target is outside of available space
+jump        jump to the value in target data is ignored
+            if const flag is used the value from the following instructions fields are loaded instead and target is ignored
+            error flag is set if target is outside of available space
+branch      conditional jump to target based on the value in data
+            if const flag is used the value from the following instructions fields are loaded instead and target is ignored
+            error flag is set if target is outside of available space
+call        jump to the value in target the pc is stored into data
+            if const flag is used the value from the following instructions fields are loaded instead
+            error flag is set if target is outside of available space
+add
+subtract
+multiply
+divide
+compare
+halt        terminate the running program
+sys
+
+
+
+
+
+
+
+
+
+
+
+
+
+load
+add
+subtract
+multiply
+divide
+compare
+compareAndSwap
+
+
+instructions:
+instructions should come in different flavors:
+constant ops,  which takes values as constants
+reference ops, which takes values as memory references
+
+load memory location with va
+add memory location with value
+subtract memory location with value
+multiply memory location by value
+divide memory location by value
