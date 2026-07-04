@@ -5,6 +5,7 @@
 #include "vm.h"
 #include "opcodes.h"
 #include <stdckdint.h>
+#include <math.h>
 
 #define OPCODE(instruction) ((instruction >> 22) & 0x3ff)
 #define FLAGS(instruction) ((instruction >> 16) & 0x3f)
@@ -18,10 +19,10 @@
 
 
 uint64_t interpret(Vm *vm) {
-    uint32_t *instrp = ((uint32_t *)(vm->memory)) + vm->pc;
+    uint32_t *instrp = (uint32_t *)(vm->memory + vm->pc);
     uint32_t instruction = *instrp;
     int size = SIZE(instruction);
-    uint64_t new_pc = vm->pc + size;
+    uint64_t new_pc = vm->pc + size * sizeof(uint32_t);
     if (FLAGS(instruction) & vm->flags)
     {   // conditional skip
         return new_pc;
@@ -157,9 +158,9 @@ uint64_t interpret(Vm *vm) {
     }
     case LOAD :
     {
-        printf("load %x %x\n", TARGET(instruction), DATA(instruction));
+//        printf("load %x %x\n", TARGET(instruction), DATA(instruction));
         int64_t value = get_reg(vm, DATA(instruction));
-        printf("value = %lld\n", value);
+//        printf("value = %lld\n", value);
         set_reg(vm, TARGET(instruction), value);
         set_flags(vm, value);
         break;
@@ -178,7 +179,7 @@ uint64_t interpret(Vm *vm) {
         int64_t result = 0;
         memcpy(&result, &value, sizeof(result));
         set_reg(vm, TARGET(instruction), result);
-        set_double_flags(vm, result);
+        set_flags_double(vm, result);
         break;
     }
     case FLOATTOINT :
@@ -227,8 +228,8 @@ uint64_t interpret(Vm *vm) {
     }
     case COMPARE :
     {
-        uint64_t first = get_reg(vm, TARGET(instruction));
-        uint64_t second = get_reg(vm, DATA(instruction));
+        int64_t first = get_reg(vm, TARGET(instruction));
+        int64_t second = get_reg(vm, DATA(instruction));
         int64_t diff = first - second;
         set_flags(vm, diff);
         break;
@@ -280,7 +281,7 @@ uint64_t interpret(Vm *vm) {
         break;
     }
     case SUBTRACT32 :
-    case SUBTRACTO64 :
+    case SUBTRACT64 :
     {
         uint64_t target_reg = TARGET(instruction);
         int64_t data = get_const(vm, size);
@@ -361,22 +362,135 @@ uint64_t interpret(Vm *vm) {
         break;
     }
     case ADDFLOAT :
+    {
+        int target_reg = TARGET(instruction);
+        double target = get_reg_double(vm, target_reg);
+        double data = get_reg_double(vm, DATA(instruction));
+        double dest = target + data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case ADDFLOAT64 :
+    {
+        int target_reg = TARGET(instruction);
+        double data = get_const_double(vm);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target + data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case SUBTRACTFLOAT :
+    {
+        int target_reg = TARGET(instruction);
+        double target = get_reg_double(vm, target_reg);
+        double data = get_reg_double(vm, DATA(instruction));
+        double dest = target - data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case SUBTRACTFLOAT64 :
+    {
+        int target_reg = TARGET(instruction);
+        double data = get_const_double(vm);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target - data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case MULTIPLYFLOAT :
+    {
+        int target_reg = TARGET(instruction);
+        double target = get_reg_double(vm, target_reg);
+        double data = get_reg_double(vm, DATA(instruction));
+        double dest = target * data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case MULTIPLYFLOAT64 :
+    {
+        int target_reg = TARGET(instruction);
+        double data = get_const_double(vm);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target * data;
+        if (isinf(dest)) {
+            set_overflow(vm);
+        }
+        else {
+            set_reg_double(vm, target_reg, dest);
+            set_flags_double(vm, dest);
+        }
         break;
+    }
     case DIVIDEFLOAT :
+     {
+        int target_reg = TARGET(instruction);
+        double target = get_reg_double(vm, target_reg);
+        double data = get_reg_double(vm, DATA(instruction));
+        if (data == 0.0) {
+            set_overflow(vm);
+        }
+        else {
+            double dest = target / data;
+            if (isinf(dest)) {
+                set_overflow(vm);
+            }
+            else {
+                set_reg_double(vm, target_reg, dest);
+                set_flags_double(vm, dest);
+            }
+        }
         break;
+    }
     case DIVIDEFLOAT64 :
+    {
+        int target_reg = TARGET(instruction);
+        double data = get_const_double(vm);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target * data;
+        if (data == 0.0) {
+            set_overflow(vm);
+        }
+        else {
+            if (isinf(dest)) {
+                set_overflow(vm);
+            }
+            else {
+                set_reg_double(vm, target_reg, dest);
+                set_flags_double(vm, dest);
+            }
+        }
         break;
-
+    }
     case NOT :
         break;
     case AND :

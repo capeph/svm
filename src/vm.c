@@ -46,6 +46,25 @@ int64_t get_reg(Vm *vm, uint8_t reg) {
 }
 
 
+double get_reg_double(Vm *vm, uint8_t reg) {
+    int64_t regval = vm->reg[reg & 127];
+    double value = 0;
+    if(reg & 128) {
+        if (regval > vm->mem_size) {
+            printf("Memory access out of bounds");
+            exit(OUT_OF_BOUNDS);
+        }
+        memcpy(&value, vm->memory + regval, sizeof(value));
+    }
+    else {
+        memcpy(&value, &regval, sizeof(value));
+    }
+    return value;
+}
+
+
+
+
 uint8_t get_byte(Vm * vm, uint8_t reg){
     int64_t regval = vm->reg[reg & 127];
     if(reg & 128) {
@@ -65,10 +84,10 @@ uint8_t get_byte(Vm * vm, uint8_t reg){
 void set_reg(Vm *vm, uint8_t reg, int64_t value) {
     if(reg & 128) {
         printf("accessing reg %x\n", reg & 127);
-        uint64_t regval = vm->reg[reg & 127];
+        int64_t regval = vm->reg[reg & 127];
         printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
-        if (regval > vm->mem_size) {
+        if (regval > vm->mem_size || regval < 0) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
@@ -80,6 +99,26 @@ void set_reg(Vm *vm, uint8_t reg, int64_t value) {
         vm->reg[reg] = value;
     }
 }
+
+void set_reg_double(Vm *vm, uint8_t reg, double value) {
+    if(reg & 128) {
+        printf("accessing reg %x\n", reg & 127);
+        int64_t regval = vm->reg[reg & 127];
+        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
+
+        if (regval > vm->mem_size | regval < 0) {
+            printf("Memory access out of bounds");
+            exit(OUT_OF_BOUNDS);
+        }
+        printf("setting [%lld] to %f\n", regval, value);
+        memcpy(vm->memory + regval, &value, sizeof(value));
+    }
+    else {
+        printf("setting reg %x to %f\n", reg, value);
+        memcpy(&vm->reg[reg], &value, sizeof(value));
+    }
+}
+
 
 void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
     if(reg & 128) {
@@ -101,13 +140,13 @@ void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
 }
 
 
-void set_flags(Vm *vm, uint64_t value)
+void set_flags(Vm *vm, int64_t value)
 {
     if (value == 0) {
         vm->flags = 1 << ZERO_FLAG;
     }
     else {
-        if (value >> 63) {
+        if (value < 0) {
             vm->flags = 1 << NEGATIVE_FLAG;
         }
         else {
@@ -115,6 +154,22 @@ void set_flags(Vm *vm, uint64_t value)
         }
     }
 }
+
+void set_flags_double(Vm *vm, double value)
+{
+    if (value == 0) {
+        vm->flags = 1 << ZERO_FLAG;
+    }
+    else {
+        if (value < 0) {
+            vm->flags = 1 << NEGATIVE_FLAG;
+        }
+        else {
+            vm->flags = 1 << POSITIVE_FLAG;
+        }
+    }
+}
+
 
 void set_overflow(Vm *vm) {
     vm->flags = 1 << OVERFLOW_FLAG;
@@ -159,17 +214,31 @@ uint32_t get_instruction(Vm *vm)
 
 uint64_t get_const(Vm *vm, int size)
 {
-    uint32_t *firstptr = ((uint32_t *)(vm->memory)) + vm->pc + 1;
+    uint32_t *firstptr = (uint32_t *)(vm->memory + vm->pc + sizeof(uint32_t));
     uint32_t first = *firstptr;
 //    printf("first hex:  %x size=%d\n", first, size);
     if (size == 3) {
-        uint32_t *secondptr = ((uint32_t *)(vm->memory)) + vm->pc + 2;
+        uint32_t *secondptr = (uint32_t *)(vm->memory + vm->pc + 2*sizeof(uint32_t));
         uint64_t second = *secondptr;
 //        printf("second hex:  %llx\n", second);
         return (second << 32) | first;
     }
     return first;
 }
+
+double get_const_double(Vm *vm)
+{
+    uint32_t *firstptr = (uint32_t *)(vm->memory + vm->pc + sizeof(uint32_t));
+    uint32_t first = *firstptr;
+//    printf("first hex:  %x size=%d\n", first, size);
+    uint32_t *secondptr = (uint32_t *)(vm->memory + vm->pc + 2*sizeof(uint32_t));
+    uint64_t uint64_bits = (((uint64_t)*secondptr) << 32) | first;
+//        printf("second hex:  %llx\n", second);
+    double result = 0;
+    memcpy(&result, &uint64_bits, sizeof(result));
+    return result;
+}
+
 
 uint64_t get_pc(Vm *vm) {
     return vm->pc;

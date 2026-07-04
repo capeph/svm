@@ -13,7 +13,7 @@
 
 
 typedef struct {
-    uint64_t pc;
+    uint64_t pc;     // pc is jus a memory reference!
     int64_t reg[128];
     uint32_t flags;
     uint8_t *memory;
@@ -26,11 +26,14 @@ void destroy_vm(Vm *vm);
 int64_t get_reg(Vm *vm, uint8_t reg);
 void set_reg(Vm *vm, uint8_t reg, int64_t value);
 
+double get_reg_double(Vm *vm, uint8_t reg);
+void set_reg_double(Vm *vm, uint8_t reg, double value);
+
 uint8_t get_byte(Vm *vm, uint8_t reg);
 void set_byte(Vm *vm, uint8_t reg, uint8_t value);
 
-void set_flags(Vm *vm, uint64_t value);
-void set_double_flags(Vm *vm, double value);
+void set_flags(Vm *vm, int64_t value);
+void set_flags_double(Vm *vm, double value);
 void set_overflow(Vm *vm);
 
 bool has_flag(Vm *vm, int flag);
@@ -41,6 +44,7 @@ void set_pc(Vm *vm, uint64_t pc);
 
 uint32_t get_instruction(Vm *vm);
 uint64_t get_const(Vm *vm, int size);
+double get_const_double(Vm *vm);
 void reset(Vm* vm);
 
 

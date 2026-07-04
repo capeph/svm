@@ -160,17 +160,17 @@ int test_ahead_back(HashMap *is, Vm *vm)
     uint32_t *dest = (uint32_t *)vm->memory;
     int size = 0;
     size += assemble(is, " AHEAD 512", dest);
-    size += assemble(is, " BACK 1", dest + size);
-    size += assemble(is, " JUMP64 98", dest + size);
+    size += assemble(is, " BACK 4", dest + size);
+    size += assemble(is, " JUMP64 1024", dest + size);
 
     vm->pc = interpret(vm);
     verify(512, vm->pc, "ahead");
-    vm->pc = 1;
+    vm->pc = 4;
     vm->pc = interpret(vm);
     verify(0, vm->pc, "back");
-    vm->pc = 2;
+    vm->pc = 8;
     vm->pc = interpret(vm);
-    verify(98, vm->pc, "jump64");
+    verify(1024, vm->pc, "jump64");
 
     return 0;
 }
@@ -210,9 +210,9 @@ int run_tests(Vm *vm)
 //    test_space();
 //    test_match();
     test_assembly(is);
-//    test_load(is, vm);
-//    test_add(is, vm);
-//    test_sub(is, vm);
+    test_load(is, vm);
+    test_add(is, vm);
+    test_sub(is, vm);
     test_ahead_back(is, vm);
     destroy_instructions(is);
     return 0;
