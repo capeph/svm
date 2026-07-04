@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include "vm.h"
 
-uint64_t interpret(Vm *vm, uint32_t instruction);
+// execute the instruction the current pc points to, return next pc
+uint64_t interpret(Vm *vm);
 
 
 #endif

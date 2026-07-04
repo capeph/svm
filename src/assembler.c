@@ -12,7 +12,7 @@
 typedef struct {
     char *name;
     int opcode;
-    uint32_t (*emitter)(char *, int, int);
+    uint32_t (*emitter)(char *, int, int, uint32_t *);
 } Builder;
 
 // gives offset of first non-space in str
@@ -94,6 +94,16 @@ int get_register(char *str, int start) {
     return num;
 }
 
+
+uint16_t get_offset(char *str, int start) {
+    if (start == -1) {
+        return -1;
+    }
+    int offset_start = nonspace(str, start);
+    long num = strtoul(str+offset_start, NULL, 10);
+    return (uint16_t)num;
+}
+
 int get_cond(char *line)
 {
     int len = strlen(line);
@@ -126,7 +136,7 @@ int get_cond(char *line)
 }
 
 void add_instr(HashMap *map, char *name,
-    int opcode, uint32_t (*emitter)(char *, int, int)) {
+    int opcode, uint32_t (*emitter)(char *, int, int, uint32_t *)) {
     Builder *builder = malloc(sizeof(Builder));
     builder->name = name;
     builder->opcode = opcode;
@@ -134,30 +144,105 @@ void add_instr(HashMap *map, char *name,
     put_map(map, name, builder);
 }
 
-uint32_t op_reg_reg(char *line, int op_end, int opcode) {
+uint32_t op_no_reg(char *line, int op_end, int opcode, uint32_t *dest) {
+    int cond = get_cond(line);
+    *dest = opcode << 22 | cond << 16;
+    return 1;
+}
+
+
+uint32_t op_with_offset(char *line, int op_end, int opcode, uint32_t *dest) {
+    uint16_t offset = get_offset(line, op_end);
+    int cond = get_cond(line);
+    *dest = opcode << 22 | cond << 16 | offset;
+    return 1;
+}
+
+uint32_t op_one_reg(char *line, int op_end, int opcode, uint32_t *dest) {
+    int reg1 = get_register(line, op_end);
+    int cond = get_cond(line);
+    *dest = opcode << 22 | cond << 16 | reg1 << 8;
+    return 1;
+}
+
+
+uint32_t op_reg_reg(char *line, int op_end, int opcode, uint32_t *dest) {
     int reg1 = get_register(line, op_end);
     int comma = find(line, ',', op_end);
     int reg2 = get_register(line, comma + 1);
     int cond = get_cond(line);
-    return opcode << 22 | cond << 16 | reg1 << 8 | reg2;
+    *dest = opcode << 22 | cond << 16 | reg1 << 8 | reg2;
+    return 1;
 }
 
-uint32_t op_reg_const(char *line, int op_end, int opcode) {
+
+uint32_t get_const32(char *line, int offset) {
+    char *const_start = line + nonspace(line, offset);
+    char *endptr;
+    uint32_t value;
+    if (const_start[0] == '-') {
+        int32_t val = (int32_t)strtol(const_start, &endptr, 10);
+        memcpy(&value, &val, sizeof(val));
+    }
+    else {
+        value = strtoul(const_start, &endptr, 10);
+//        printf("reading from %s gives %d\n", const_start, value);
+    }
+    return value;
+}
+
+uint64_t get_const64(char *line, int offset) {
+    char *const_start = line + nonspace(line, offset);
+    char *endptr;
+    uint64_t value;
+    if (const_start[0] == '-') {
+        int64_t val = (int64_t)strtoll(const_start, &endptr, 10);
+        memcpy(&value, &val, sizeof(val));
+    }
+    else {
+        value = strtoull(const_start, &endptr, 10);
+    }
+    return value;
+}
+
+uint32_t op_reg_const(char *line, int op_end, int opcode, uint32_t *dest) {
         int reg1 = get_register(line, op_end);
+        int comma = find(line, ',', op_end);
         int cond = get_cond(line);
-        return LOADHALF << 22 | cond << 16 | reg1 << 8;
+        int size = GET_SIZE(opcode);
+        *dest = opcode << 22 | cond << 16 | reg1 << 8;
+        if (size == 2) {
+            uint32_t value = get_const32(line, comma + 1);
+//            printf("got size %d, value %d\n", size, value);
+            *(dest + 1) = value;
+        }
+        else if (size == 3) {
+            uint64_t value = get_const64(line, comma + 1);
+//            printf("got size %d, value %lld\n", size, value);
+            *((uint64_t *)(dest + 1)) = value;
+        }
+        return size;
 }
 
-
-HashMap *create_instructions() {
-    HashMap *map = create_map(256);
-    add_instr(map, "LOAD", LOAD, &op_reg_reg);
-    add_instr(map, "LOADHALF", LOADHALF, &op_reg_const);
-    add_instr(map, "LOADCONST", LOADCONST, &op_reg_const);
-    add_instr(map, "ADD", ADD, &op_reg_reg);
-    add_instr(map, "SUBTRACT", SUBTRACT, &op_reg_reg);
-    return map;
+// Nooo... we are wasting 16 bits / two registers
+uint32_t op_const(char *line, int op_end, int opcode, uint32_t *dest) {
+        int cond = get_cond(line);
+        int size = GET_SIZE(opcode);
+        int offset = nonspace(line, op_end);
+        *dest = opcode << 22 | cond << 16;
+        if (size == 2) {
+            uint32_t value = get_const32(line, offset);
+//            printf("got size %d, value %d\n", size, value);
+            *(dest + 1) = value;
+        }
+        else if (size == 3) {
+            uint64_t value = get_const64(line, offset);
+//            printf("got size %d, value %lld\n", size, value);
+            *((uint64_t *)(dest + 1)) = value;
+        }
+        return size;
 }
+
 
 void destroy_instructions(HashMap *map) {
     for(int i = 0; i < map->size; i++) {
@@ -170,19 +255,57 @@ void destroy_instructions(HashMap *map) {
             node = next;
         };
     }
+}
 
+HashMap *create_instructions() {
+    HashMap *map = create_map(256);
+    add_instr(map, "HALT", HALT, &op_no_reg);
+    add_instr(map, "AHEAD", AHEAD, &op_with_offset);
+    add_instr(map, "BACK", BACK, &op_with_offset);
+    add_instr(map, "JUMP", JUMP, &op_one_reg);
+    add_instr(map, "JUMP32", JUMP32, &op_const);
+    add_instr(map, "JUMP64", JUMP64, &op_const);
+    add_instr(map, "JUMPNEGATIVE", JUMPZERO, &op_reg_reg);
+    add_instr(map, "JUMPZERO32", JUMPZERO32, &op_reg_const);
+    add_instr(map, "JUMPZERO64", JUMPZERO64, &op_reg_const);
+    add_instr(map, "JUMPNOTZERO", JUMPNOTZERO, &op_reg_reg);
+    add_instr(map, "JUMPNOTZERO32", JUMPNOTZERO32, &op_reg_const);
+    add_instr(map, "JUMPNOTZERO64", JUMPNOTZERO64, &op_reg_const);
+    add_instr(map, "JUMPPOSITIVE", JUMPPOSITIVE, &op_reg_reg);
+    add_instr(map, "JUMPPOSITIVE32", JUMPPOSITIVE32, &op_reg_const);
+    add_instr(map, "JUMPPOSITIVE64", JUMPPOSITIVE64, &op_reg_const);
+    add_instr(map, "JUMPNOTPOSITIVE", JUMPNOTPOSITIVE, &op_reg_reg);
+    add_instr(map, "JUMPNOTPOSITIVE32", JUMPNOTPOSITIVE32, &op_reg_const);
+    add_instr(map, "JUMPNOTPOSITIVE64", JUMPNOTPOSITIVE64, &op_reg_const);
+    add_instr(map, "JUMPNEGATIVE", JUMPNEGATIVE, &op_reg_reg);
+    add_instr(map, "JUMPNEGATIVE32", JUMPNEGATIVE32, &op_reg_const);
+    add_instr(map, "JUMPNEGATIVE64", JUMPNEGATIVE64, &op_reg_const);
+    add_instr(map, "JUMPNOTNEGATIVE", JUMPNOTNEGATIVE, &op_reg_reg);
+    add_instr(map, "JUMPNOTNEGATIVE32", JUMPNOTNEGATIVE32, &op_reg_const);
+    add_instr(map, "JUMPNOTNEGATIVE64", JUMPNOTNEGATIVE64, &op_reg_const);
+    add_instr(map, "CALL", CALL, &op_reg_reg);
+    add_instr(map, "CALL32", CALL32, &op_reg_const);
+    add_instr(map, "CALL64", CALL64, &op_reg_const);
+    add_instr(map, "LOAD", LOAD, &op_reg_reg);
+    add_instr(map, "LOAD32", LOAD32, &op_reg_const);
+    add_instr(map, "LOAD64", LOAD64, &op_reg_const);
+    add_instr(map, "ADD", ADD, &op_reg_reg);
+    add_instr(map, "SUBTRACT", SUBTRACT, &op_reg_reg);
+
+    return map;
 }
 
 
-uint32_t assemble(HashMap *codes, char *line) {
+uint32_t assemble(HashMap *codes, char *line, uint32_t *dest) {
     char opcode[25];
     int op_start = nonspace(line, 0);
     int op_end = space(line, op_start);
     memcpy(opcode, line + op_start, op_end);
     opcode[op_end - op_start] = '\0';
+//    printf("got opcode %s\n", opcode);
     Builder *builder = get_map(codes, opcode);
     if (builder == NULL) {
         printf("Unknown opcode %s\n", opcode);
     }
-    return builder->emitter(line, op_end, builder->opcode);
+    return builder->emitter(line, op_end, builder->opcode, dest);
 }

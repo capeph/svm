@@ -14,10 +14,12 @@
 
 /* modifiers */
 
-#define SIZE(instruction) ((instruction >> 22 ) && 3) // size is low bits of the opcode
+#define SIZE(instruction) ((instruction >> 22 ) & 3) // size is low bits of the opcode
 
 
-uint64_t interpret(Vm *vm, uint32_t instruction) {
+uint64_t interpret(Vm *vm) {
+    uint32_t *instrp = ((uint32_t *)(vm->memory)) + vm->pc;
+    uint32_t instruction = *instrp;
     int size = SIZE(instruction);
     uint64_t new_pc = vm->pc + size;
     if (FLAGS(instruction) & vm->flags)
@@ -25,7 +27,7 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         return new_pc;
     }
     int opcode = OPCODE(instruction);
-    printf("Opcode is %d (%x)\n", opcode, opcode);
+    printf("Opcode is %d (%x), size is %d\n", opcode, opcode, size);
 
     switch (OPCODE(instruction)) {
     case HALT :
@@ -47,9 +49,10 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
     case JUMP :
         new_pc = get_reg(vm, TARGET(instruction));
         break;
-    case JUMPHALF :
-    case JUMPCONST :
+    case JUMP32 :
+    case JUMP64 :
         new_pc = get_const(vm, size);
+        printf("got const %lld\n", new_pc);
         break;
     case JUMPZERO :
         set_flags(vm, get_reg(vm, DATA(instruction)));
@@ -57,8 +60,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPZEROHALF :
-    case JUMPZEROCONST :
+    case JUMPZERO32 :
+    case JUMPZERO64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (vm->flags & ZERO_FLAG) {
             new_pc = get_const(vm, size);
@@ -70,8 +73,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPNOTZEROHALF :
-    case JUMPNOTZEROCONST :
+    case JUMPNOTZERO32 :
+    case JUMPNOTZERO64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (!(vm->flags & ZERO_FLAG)) {
             new_pc = get_const(vm, size);
@@ -83,8 +86,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPPOSITIVEHALF :
-    case JUMPPOSITIVECONST :
+    case JUMPPOSITIVE32 :
+    case JUMPPOSITIVE64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (vm->flags & POSITIVE_FLAG) {
             new_pc = get_const(vm, size);
@@ -96,8 +99,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPNOTPOSITIVEHALF :
-    case JUMPNOTPOSITIVECONST :
+    case JUMPNOTPOSITIVE32 :
+    case JUMPNOTPOSITIVE64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (!(vm->flags & POSITIVE_FLAG)) {
             new_pc = get_const(vm, size);
@@ -109,8 +112,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPNEGATIVEHALF :
-    case JUMPNEGATIVECONST :
+    case JUMPNEGATIVE32 :
+    case JUMPNEGATIVE64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (vm->flags & NEGATIVE_FLAG) {
             new_pc = get_const(vm, size);
@@ -122,8 +125,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
             new_pc = get_reg(vm, TARGET(instruction));
         }
         break;
-    case JUMPNOTNEGATIVEHALF :
-    case JUMPNOTNEGATIVECONST :
+    case JUMPNOTNEGATIVE32 :
+    case JUMPNOTNEGATIVE64 :
         set_flags(vm, get_reg(vm, DATA(instruction)));
         if (!(vm->flags & NEGATIVE_FLAG)) {
             new_pc = get_const(vm, size);
@@ -134,8 +137,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         set_flags(vm, 0);
         new_pc = get_reg(vm, TARGET(instruction));
         break;
-    case CALLHALF :
-    case CALLCONST :
+    case CALL32 :
+    case CALL64 :
         set_reg(vm, DATA(instruction), new_pc);
         set_flags(vm, 0);
         new_pc = get_reg(vm, get_const(vm, size));
@@ -146,7 +149,7 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         set_byte(vm, TARGET(instruction), byte);
         break;
     }
-    case LOADBYTECONST :
+    case LOADBYTE64 :
     {
         uint8_t byte = DATA(instruction);
         set_byte(vm, TARGET(instruction), byte);
@@ -161,8 +164,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         set_flags(vm, value);
         break;
     }
-    case LOADHALF :
-    case LOADCONST :
+    case LOAD32 :
+    case LOAD64 :
     {
         uint64_t value = get_const(vm, size);
         set_reg(vm, TARGET(instruction), value);
@@ -245,8 +248,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         }
         break;
     }
-    case ADDHALF :
-    case ADDCONST :
+    case ADD32 :
+    case ADD64 :
     {
         uint64_t target_reg = TARGET(instruction);
         int64_t data = get_const(vm, size);
@@ -276,8 +279,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         }
         break;
     }
-    case SUBTRACTHALF :
-    case SUBTRACTOCONST :
+    case SUBTRACT32 :
+    case SUBTRACTO64 :
     {
         uint64_t target_reg = TARGET(instruction);
         int64_t data = get_const(vm, size);
@@ -307,8 +310,8 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         }
         break;
     }
-    case MULTIPLYHALF :
-    case MULTIPLYCONST :
+    case MULTIPLY32 :
+    case MULTIPLY64 :
     {
         uint64_t target_reg = TARGET(instruction);
         int64_t data = get_const(vm, size);
@@ -339,9 +342,9 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
         }
         break;
     }
-    case DIVIDEHALF :
+    case DIVIDE32 :
         break;
-    case DIVIDECONST :
+    case DIVIDE64 :
     {
         uint64_t target_reg = TARGET(instruction);
         int64_t target = get_reg(vm, target_reg);
@@ -359,66 +362,66 @@ uint64_t interpret(Vm *vm, uint32_t instruction) {
     }
     case ADDFLOAT :
         break;
-    case ADDFLOATCONST :
+    case ADDFLOAT64 :
         break;
     case SUBTRACTFLOAT :
         break;
-    case SUBTRACTFLOATCONST :
+    case SUBTRACTFLOAT64 :
         break;
     case MULTIPLYFLOAT :
         break;
-    case MULTIPLYFLOATCONST :
+    case MULTIPLYFLOAT64 :
         break;
     case DIVIDEFLOAT :
         break;
-    case DIVIDEFLOATCONST :
+    case DIVIDEFLOAT64 :
         break;
 
     case NOT :
         break;
     case AND :
         break;
-    case ANDHALF :
+    case AND32 :
         break;
-    case ANDCONST :
+    case AND64 :
         break;
     case NAND :
         break;
-    case NANDHALF :
+    case NAND32 :
         break;
-    case NANDCONST :
+    case NAND64 :
         break;
     case OR :
         break;
-    case ORHALF :
+    case OR32 :
         break;
-    case ORCONST :
+    case OR64 :
         break;
     case NOR :
         break;
-    case NORHALF :
+    case NOR32 :
         break;
-    case NORCONST :
+    case NOR64 :
         break;
     case XOR :
         break;
-    case XORHALF :
+    case XOR32 :
         break;
-    case XORCONST :
+    case XOR64 :
         break;
     case XNOR :
         break;
-    case XNORHALF :
+    case XNOR32 :
         break;
-    case XNORCONST :
+    case XNOR64 :
         break;
 
 
 
     }
 
-    if (new_pc > vm->mem_size) {
-        printf("instruction overrun");
+    if (new_pc * sizeof(uint32_t) > vm->mem_size) {
+        printf("instruction overrun new_pc=%lld", new_pc);
         exit(-1);
     }
     return new_pc;

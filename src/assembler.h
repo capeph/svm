@@ -12,7 +12,7 @@ bool match(char *match, char *str, int start, int end);
 HashMap *create_instructions();
 void destroy_instructions(HashMap *map);
 
-uint32_t assemble(HashMap *builders, char *instruction);
+uint32_t assemble(HashMap *builders, char *instruction, uint32_t *dest);
 
 
 #endif

@@ -41,7 +41,7 @@ void set_pc(Vm *vm, uint64_t pc);
 
 uint32_t get_instruction(Vm *vm);
 uint64_t get_const(Vm *vm, int size);
-
+void reset(Vm* vm);
 
 
 #endif

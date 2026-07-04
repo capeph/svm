@@ -45,11 +45,12 @@ int64_t get_reg(Vm *vm, uint8_t reg) {
     }
 }
 
+
 uint8_t get_byte(Vm * vm, uint8_t reg){
     int64_t regval = vm->reg[reg & 127];
     if(reg & 128) {
         if (regval > vm->mem_size) {
-            printf("Memory access out of bounds");
+            printf("Memory access out of bounds %lld is more than mem_size %lld\n", regval, vm->mem_size);
             exit(OUT_OF_BOUNDS);
         }
         uint8_t value = 0;
@@ -71,7 +72,7 @@ void set_reg(Vm *vm, uint8_t reg, int64_t value) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
-        printf("setting 0x[%llx] to %lld\n", regval, value);
+        printf("setting [%lld] to %lld\n", regval, value);
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
@@ -90,11 +91,11 @@ void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
-        printf("setting 0x[%llx] to %d\n", regval, value);
+        printf("setting [%lld] to %d\n", regval, value);
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-        printf("setting reg %x to %d\n", reg, value);
+        printf("setting reg %d to %d\n", reg, value);
         vm->reg[reg] = value;
     }
 }
@@ -151,15 +152,21 @@ void set_flag(Vm * vm, int flag, bool value) {
 
 uint32_t get_instruction(Vm *vm)
 {
-    return *(vm->memory + vm->pc);
+
+    uint32_t *instrp = ((uint32_t *)(vm->memory)) + vm->pc;
+    return *instrp;
 }
 
 uint64_t get_const(Vm *vm, int size)
 {
-    uint32_t first = *(vm->memory + vm->pc + 1);
-    if (size == 2) {
-        uint64_t second = *(vm->memory + vm->pc + 2);
-        return (second << 32) & first;
+    uint32_t *firstptr = ((uint32_t *)(vm->memory)) + vm->pc + 1;
+    uint32_t first = *firstptr;
+//    printf("first hex:  %x size=%d\n", first, size);
+    if (size == 3) {
+        uint32_t *secondptr = ((uint32_t *)(vm->memory)) + vm->pc + 2;
+        uint64_t second = *secondptr;
+//        printf("second hex:  %llx\n", second);
+        return (second << 32) | first;
     }
     return first;
 }
@@ -171,4 +178,10 @@ uint64_t get_pc(Vm *vm) {
 
 void set_pc(Vm *vm, uint64_t pc) {
     vm->pc = pc;
+}
+
+void reset(Vm *vm) {
+    vm->pc = 0;
+    memset(vm->memory, vm->mem_size, sizeof(uint8_t));
+    memset(vm->reg, 128, sizeof(int64_t));
 }

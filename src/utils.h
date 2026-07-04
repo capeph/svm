@@ -6,7 +6,7 @@
 #define FILE_ERROR -3
 #define OUT_OF_BOUNDS -4
 
-#define DEFAULT_SIZE 100
+#define DEFAULT_SIZE 32000
 #define W_SIZE sizeof(uint32_t)
 
 
