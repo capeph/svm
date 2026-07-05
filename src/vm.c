@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "utils.h"
+#include "interpreter.h"
 
 Vm *create_vm(uint64_t mem_size)
 {
@@ -83,38 +84,38 @@ uint8_t get_byte(Vm * vm, uint8_t reg){
 
 void set_reg(Vm *vm, uint8_t reg, int64_t value) {
     if(reg & 128) {
-        printf("accessing reg %x\n", reg & 127);
+//        printf("accessing reg %x\n", reg & 127);
         int64_t regval = vm->reg[reg & 127];
-        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
+//        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
         if (regval > vm->mem_size || regval < 0) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
-        printf("setting [%lld] to %lld\n", regval, value);
+//        printf("setting [%lld] to %lld\n", regval, value);
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-        printf("setting reg %x to %lld\n", reg, value);
+//        printf("setting reg %x to %lld\n", reg, value);
         vm->reg[reg] = value;
     }
 }
 
 void set_reg_double(Vm *vm, uint8_t reg, double value) {
     if(reg & 128) {
-        printf("accessing reg %x\n", reg & 127);
+//        printf("accessing reg %x\n", reg & 127);
         int64_t regval = vm->reg[reg & 127];
-        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
+//        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
         if (regval > vm->mem_size | regval < 0) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
-        printf("setting [%lld] to %f\n", regval, value);
+//        printf("setting [%lld] to %f\n",si regval, value);
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-        printf("setting reg %x to %f\n", reg, value);
+//        printf("setting reg %x to %f\n", reg, value);
         memcpy(&vm->reg[reg], &value, sizeof(value));
     }
 }
@@ -122,19 +123,19 @@ void set_reg_double(Vm *vm, uint8_t reg, double value) {
 
 void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
     if(reg & 128) {
-        printf("accessing reg %x\n", reg & 127);
+//        printf("accessing reg %x\n", reg & 127);
         uint64_t regval = vm->reg[reg & 127];
-        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
+//        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
         if (regval > vm->mem_size) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
-        printf("setting [%lld] to %d\n", regval, value);
+//        printf("setting [%lld] to %d\n", regval, value);
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-        printf("setting reg %d to %d\n", reg, value);
+//        printf("setting reg %d to %d\n", reg, value);
         vm->reg[reg] = value;
     }
 }
@@ -251,6 +252,15 @@ void set_pc(Vm *vm, uint64_t pc) {
 
 void reset(Vm *vm) {
     vm->pc = 0;
+    vm->run = false;
     memset(vm->memory, vm->mem_size, sizeof(uint8_t));
     memset(vm->reg, 128, sizeof(int64_t));
+}
+
+void run(Vm *vm, uint64_t start) {
+    vm->pc = start;
+    vm->run = true;
+    while(vm->run) {
+        vm->pc = interpret(vm);
+    }
 }

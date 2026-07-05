@@ -14,6 +14,7 @@
 
 typedef struct {
     uint64_t pc;     // pc is jus a memory reference!
+    bool run;
     int64_t reg[128];
     uint32_t flags;
     uint8_t *memory;

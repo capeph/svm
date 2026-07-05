@@ -28,12 +28,12 @@ uint64_t interpret(Vm *vm) {
         return new_pc;
     }
     int opcode = OPCODE(instruction);
-    printf("Opcode is %d (%x), size is %d\n", opcode, opcode, size);
+//    printf("Opcode is %d (%x), size is %d\n", opcode, opcode, size);
 
-    switch (OPCODE(instruction)) {
+    switch (opcode) {
     case HALT :
         printf("System halted\n");
-        exit(0);
+        vm->run = false;
      case AHEAD :
         new_pc = vm->pc + OFFSET(instruction);
         break;
@@ -53,7 +53,7 @@ uint64_t interpret(Vm *vm) {
     case JUMP32 :
     case JUMP64 :
         new_pc = get_const(vm, size);
-        printf("got const %lld\n", new_pc);
+//        printf("got const %lld\n", new_pc);
         break;
     case JUMPZERO :
         set_flags(vm, get_reg(vm, DATA(instruction)));
@@ -184,10 +184,9 @@ uint64_t interpret(Vm *vm) {
     }
     case FLOATTOINT :
     {
-        int64_t value = get_reg(vm, DATA(instruction));
-        double double_val;
-        memcpy(&double_val, &value, sizeof(double_val));
-        value = (uint64_t)double_val;
+        double double_value = get_reg_double(vm, DATA(instruction));
+//        printf("got value %f", double_value);
+        uint64_t value = (uint64_t)double_value;
         set_reg(vm, TARGET(instruction), value);
         set_flags(vm, value);
         break;
@@ -361,6 +360,13 @@ uint64_t interpret(Vm *vm) {
         }
         break;
     }
+    case LOADFLOAT :
+    {
+        double value = get_const_double(vm);
+        set_reg_double(vm, TARGET(instruction), value);
+        set_flags_double(vm, value);
+        break;
+    }
     case ADDFLOAT :
     {
         int target_reg = TARGET(instruction);
@@ -380,8 +386,9 @@ uint64_t interpret(Vm *vm) {
     {
         int target_reg = TARGET(instruction);
         double data = get_const_double(vm);
-        int64_t target = get_reg(vm, target_reg);
-        int64_t dest = target + data;
+        double target = get_reg_double(vm, target_reg);
+        double dest = target + data;
+        printf("addfloat64 [%f], %f = %f\n", target, data, dest);
         if (isinf(dest)) {
             set_overflow(vm);
         }
@@ -410,8 +417,8 @@ uint64_t interpret(Vm *vm) {
     {
         int target_reg = TARGET(instruction);
         double data = get_const_double(vm);
-        int64_t target = get_reg(vm, target_reg);
-        int64_t dest = target - data;
+        double target = get_reg_double(vm, target_reg);
+        double dest = target - data;
         if (isinf(dest)) {
             set_overflow(vm);
         }
@@ -440,8 +447,8 @@ uint64_t interpret(Vm *vm) {
     {
         int target_reg = TARGET(instruction);
         double data = get_const_double(vm);
-        int64_t target = get_reg(vm, target_reg);
-        int64_t dest = target * data;
+        double target = get_reg(vm, target_reg);
+        double dest = target * data;
         if (isinf(dest)) {
             set_overflow(vm);
         }
@@ -475,8 +482,8 @@ uint64_t interpret(Vm *vm) {
     {
         int target_reg = TARGET(instruction);
         double data = get_const_double(vm);
-        int64_t target = get_reg(vm, target_reg);
-        int64_t dest = target * data;
+        double target = get_reg(vm, target_reg);
+        double dest = target * data;
         if (data == 0.0) {
             set_overflow(vm);
         }

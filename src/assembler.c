@@ -15,7 +15,9 @@ typedef struct {
     uint32_t (*emitter)(char *, int, int, uint32_t *);
 } Builder;
 
+
 // gives offset of first non-space in str
+// returns -1 if no nonspace found
 int nonspace(char *str, int start) {
     int i = start;
     while (str[i] == ' ' || str[i] == '\t') {
@@ -63,28 +65,20 @@ bool match(char *match, char *str, int start, int end)
     return true;
 }
 
-int get_register(char *str, int start) {
+
+int read_register(char *str, int start) {
     if (start == -1) {
-        return -1;
+        printf("assembly failed for %s: no register - invalid start offset\n", str);
+        exit(-1);
     }
     int reg_start = nonspace(str, start);
     bool reference = str[reg_start] == '[';
-    int reg_end = reg_start;
     if (reference) {
         reg_start++;
-        reg_end = find(str, ']', reg_start);
-    }
-    else {
-        reg_end = find(str, ',', reg_start);
-        if (reg_end == -1) {
-            reg_end = space(str, reg_start);
-        }
-        if (reg_end == -1) {
-            reg_end = strlen(str);
-        }
     }
     if (str[reg_start] != 'R') {
-        return -1;
+        printf("assembly failed for %s: expected register\n", str);
+        exit(-1);
     }
     reg_start++;
     long num = strtol(str+reg_start, NULL, 10);
@@ -95,16 +89,17 @@ int get_register(char *str, int start) {
 }
 
 
-uint16_t get_offset(char *str, int start) {
+uint16_t read_offset(char *str, int start) {
     if (start == -1) {
-        return -1;
+        printf("assembly failed for %s: expected offset at %d\n", str, start);
+        exit(-1);
     }
     int offset_start = nonspace(str, start);
     long num = strtoul(str+offset_start, NULL, 10);
     return (uint16_t)num;
 }
 
-int get_cond(char *line)
+int read_cond(char *line)
 {
     int len = strlen(line);
     int startpos = -1;
@@ -145,38 +140,39 @@ void add_instr(HashMap *map, char *name,
 }
 
 uint32_t op_no_reg(char *line, int op_end, int opcode, uint32_t *dest) {
-    int cond = get_cond(line);
+    int cond = read_cond(line);
     *dest = opcode << 22 | cond << 16;
     return 1;
 }
 
 
 uint32_t op_with_offset(char *line, int op_end, int opcode, uint32_t *dest) {
-    uint16_t offset = get_offset(line, op_end);
-    int cond = get_cond(line);
+    uint16_t offset = read_offset(line, op_end);
+    int cond = read_cond(line);
     *dest = opcode << 22 | cond << 16 | offset;
     return 1;
 }
 
 uint32_t op_one_reg(char *line, int op_end, int opcode, uint32_t *dest) {
-    int reg1 = get_register(line, op_end);
-    int cond = get_cond(line);
+    int reg1 = read_register(line, op_end);
+    int cond = read_cond(line);
     *dest = opcode << 22 | cond << 16 | reg1 << 8;
     return 1;
 }
 
 
 uint32_t op_reg_reg(char *line, int op_end, int opcode, uint32_t *dest) {
-    int reg1 = get_register(line, op_end);
+    int reg1 = read_register(line, op_end);
     int comma = find(line, ',', op_end);
-    int reg2 = get_register(line, comma + 1);
-    int cond = get_cond(line);
+    int reg2 = read_register(line, comma + 1);
+    int cond = read_cond(line);
+//    printf("op_reg_reg %d %d %d: %s\n", opcode, reg1, reg2, line);
     *dest = opcode << 22 | cond << 16 | reg1 << 8 | reg2;
     return 1;
 }
 
 
-uint32_t get_const32(char *line, int offset) {
+uint32_t read_const32(char *line, int offset) {
     char *const_start = line + nonspace(line, offset);
     char *endptr;
     uint32_t value;
@@ -191,7 +187,7 @@ uint32_t get_const32(char *line, int offset) {
     return value;
 }
 
-uint64_t get_const64(char *line, int offset) {
+uint64_t read_const64(char *line, int offset) {
     char *const_start = line + nonspace(line, offset);
     char *endptr;
     uint64_t value;
@@ -205,38 +201,65 @@ uint64_t get_const64(char *line, int offset) {
     return value;
 }
 
+
+double read_const_double(char *line, int offset) {
+    char *const_start = line + nonspace(line, offset);
+    char *endptr;
+    double value;
+    value = strtod(const_start, &endptr);
+//    printf("double %s, parsed to %lf\n", const_start, value);
+    return value;
+}
+
 uint32_t op_reg_const(char *line, int op_end, int opcode, uint32_t *dest) {
-        int reg1 = get_register(line, op_end);
+        int reg1 = read_register(line, op_end);
         int comma = find(line, ',', op_end);
-        int cond = get_cond(line);
+        int cond = read_cond(line);
         int size = GET_SIZE(opcode);
         *dest = opcode << 22 | cond << 16 | reg1 << 8;
         if (size == 2) {
-            uint32_t value = get_const32(line, comma + 1);
+            uint32_t value = read_const32(line, comma + 1);
 //            printf("got size %d, value %d\n", size, value);
             *(dest + 1) = value;
         }
         else if (size == 3) {
-            uint64_t value = get_const64(line, comma + 1);
+            uint64_t value = read_const64(line, comma + 1);
 //            printf("got size %d, value %lld\n", size, value);
             *((uint64_t *)(dest + 1)) = value;
         }
         return size;
 }
 
+uint32_t op_reg_float(char *line, int op_end, int opcode, uint32_t *dest) {
+        int reg1 = read_register(line, op_end);
+        int comma = find(line, ',', op_end);
+        int cond = read_cond(line);
+        int size = GET_SIZE(opcode);
+        if (size != 3) {
+            printf("Malformed opcode\n");
+            exit(-1);
+        }
+        *dest = opcode << 22 | cond << 16 | reg1 << 8;
+        double value = read_const_double(line, comma + 1);
+//            printf("got size %d, value %f\n", size, value);
+        *((double *)(dest + 1)) = value;
+
+        return size;
+}
+
 // Nooo... we are wasting 16 bits / two registers
 uint32_t op_const(char *line, int op_end, int opcode, uint32_t *dest) {
-        int cond = get_cond(line);
+        int cond = read_cond(line);
         int size = GET_SIZE(opcode);
         int offset = nonspace(line, op_end);
         *dest = opcode << 22 | cond << 16;
         if (size == 2) {
-            uint32_t value = get_const32(line, offset);
+            uint32_t value = read_const32(line, offset);
 //            printf("got size %d, value %d\n", size, value);
             *(dest + 1) = value;
         }
         else if (size == 3) {
-            uint64_t value = get_const64(line, offset);
+            uint64_t value = read_const64(line, offset);
 //            printf("got size %d, value %lld\n", size, value);
             *((uint64_t *)(dest + 1)) = value;
         }
@@ -291,7 +314,17 @@ HashMap *create_instructions() {
     add_instr(map, "LOAD64", LOAD64, &op_reg_const);
     add_instr(map, "ADD", ADD, &op_reg_reg);
     add_instr(map, "SUBTRACT", SUBTRACT, &op_reg_reg);
-
+    add_instr(map, "LOADFLOAT", LOADFLOAT, &op_reg_float);
+    add_instr(map, "ADDFLOAT", ADDFLOAT, &op_reg_reg);
+    add_instr(map, "ADDFLOAT64", ADDFLOAT64, &op_reg_float);
+    add_instr(map, "SUBTRACTFLOAT", SUBTRACTFLOAT, &op_reg_reg);
+    add_instr(map, "SUBTRACTFLOAT64", SUBTRACTFLOAT, &op_reg_float);
+    add_instr(map, "MULTIPLYFLOAT", MULTIPLYFLOAT, &op_reg_reg);
+    add_instr(map, "MULTIPLYFLOAT64", MULTIPLYFLOAT64, &op_reg_float);
+    add_instr(map, "DIVIDEFLOAT", DIVIDEFLOAT, &op_reg_reg);
+    add_instr(map, "DIVIDEFLOAT64", DIVIDEFLOAT64, &op_reg_float);
+    add_instr(map, "FLOATTOINT", FLOATTOINT, &op_reg_reg);
+    add_instr(map, "INTTOFLOAT", INTTOFLOAT, &op_reg_reg);
     return map;
 }
 
@@ -307,5 +340,10 @@ uint32_t assemble(HashMap *codes, char *line, uint32_t *dest) {
     if (builder == NULL) {
         printf("Unknown opcode %s\n", opcode);
     }
-    return builder->emitter(line, op_end, builder->opcode, dest);
+    int size = builder->emitter(line, op_end, builder->opcode, dest);
+    printf("parsed: %s\n", line);
+    for(int i = 0; i < size; i++) {
+        printf("emitted %d of %d: %x\n", i, size, *(dest + i));
+    }
+    return size;
 }

@@ -5,10 +5,20 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 void verify(int a, int b, char *string) {
     if (a != b) {
         printf("%s failed, got %d, expected %d\n", string, b, a);
+    }
+    else {
+        printf("%s passed\n", string);
+    }
+}
+
+void verify_double(double a, double b, char *string) {
+    if (fabs(a-b) > a * 1e-6) {
+        printf("%s failed, got %f, expected %f\n", string, b, a);
     }
     else {
         printf("%s passed\n", string);
@@ -176,7 +186,6 @@ int test_ahead_back(HashMap *is, Vm *vm)
 }
 
 
-
 int test_sub(HashMap *is, Vm *vm)
 {
     reset(vm);
@@ -202,6 +211,23 @@ int test_sub(HashMap *is, Vm *vm)
 }
 
 
+void test_float(HashMap *is, Vm *vm) {
+    reset(vm);
+        //inject some code to test;
+    uint32_t *dest = (uint32_t *)vm->memory;
+    int size = 0;
+    size += assemble(is, " LOADFLOAT R1, 25.3", dest);
+    size += assemble(is, " ADDFLOAT64 R1, 9.7", dest + size);
+    size += assemble(is, " FLOATTOINT R0, R1", dest + size);
+
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    verify_double(35.0, get_reg_double(vm, 1), "addfloat");
+    verify(35, vm->reg[0], "conversion");
+}
+
 int run_tests(Vm *vm)
 {
     HashMap *is = create_instructions();
@@ -214,6 +240,7 @@ int run_tests(Vm *vm)
     test_add(is, vm);
     test_sub(is, vm);
     test_ahead_back(is, vm);
+    test_float(is, vm);
     destroy_instructions(is);
     return 0;
 }
