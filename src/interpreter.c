@@ -150,8 +150,8 @@ uint64_t interpret(Vm *vm) {
         set_byte(vm, TARGET(instruction), byte);
         break;
     }
-    case LOADBYTE64 :
-    {
+    case LOADCONSTBYTE :
+    {   // use the data register bits for the byte constant
         uint8_t byte = DATA(instruction);
         set_byte(vm, TARGET(instruction), byte);
         break;
@@ -233,6 +233,12 @@ uint64_t interpret(Vm *vm) {
         set_flags(vm, diff);
         break;
     }
+    case NEGATE :
+    {
+        int64_t data = -get_reg(vm, DATA(instruction));
+        set_reg(vm, TARGET(instruction), data);
+        set_flags(vm, data);
+    }
     case ADD :
     {
         uint64_t target_reg = TARGET(instruction);
@@ -244,7 +250,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -260,7 +266,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -275,7 +281,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -291,7 +297,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -306,7 +312,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -322,7 +328,7 @@ uint64_t interpret(Vm *vm) {
         }
         else {
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -338,7 +344,7 @@ uint64_t interpret(Vm *vm) {
         else {
             dest = target / data;
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
@@ -356,13 +362,20 @@ uint64_t interpret(Vm *vm) {
         else {
             dest = target / data;
             set_reg(vm, target_reg, dest);
-            set_flags(vm, target);
+            set_flags(vm, dest);
         }
         break;
     }
     case LOADFLOAT :
     {
         double value = get_const_double(vm);
+        set_reg_double(vm, TARGET(instruction), value);
+        set_flags_double(vm, value);
+        break;
+    }
+    case NEGATEFLOAT :
+    {
+        double value = -get_reg_double(vm, DATA(instruction));
         set_reg_double(vm, TARGET(instruction), value);
         set_flags_double(vm, value);
         break;
@@ -499,46 +512,140 @@ uint64_t interpret(Vm *vm) {
         break;
     }
     case NOT :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_reg(vm, DATA(instruction));
+        int64_t dest = ~data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case AND :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t data = get_reg(vm, DATA(instruction));
+        int64_t dest = target & data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case AND32 :
-        break;
     case AND64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target & data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case NAND :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t data = get_reg(vm, DATA(instruction));
+        int64_t dest = ~(target & data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case NAND32 :
-        break;
     case NAND64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = ~(target & data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case OR :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t data = get_reg(vm, DATA(instruction));
+        int64_t dest = target | data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case OR32 :
-        break;
     case OR64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target | data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case NOR :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = ~(target | data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case NOR32 :
-        break;
     case NOR64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = ~(target | data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case XOR :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target ^ data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case XOR32 :
-        break;
     case XOR64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = target ^ data;
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case XNOR :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = ~(target ^ data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
+    }
     case XNOR32 :
-        break;
     case XNOR64 :
+    {
+        uint64_t target_reg = TARGET(instruction);
+        int64_t data = get_const(vm, size);
+        int64_t target = get_reg(vm, target_reg);
+        int64_t dest = ~(target ^ data);
+        set_reg(vm, target_reg, dest);
+        set_flags(vm, dest);
         break;
-
-
-
+    }
     }
 
     if (new_pc * sizeof(uint32_t) > vm->mem_size) {

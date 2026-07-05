@@ -172,6 +172,14 @@ uint32_t op_reg_reg(char *line, int op_end, int opcode, uint32_t *dest) {
 }
 
 
+uint8_t read_const8(char *line, int offset) {
+    char *const_start = line + nonspace(line, offset);
+    char *endptr;
+    uint8_t value = strtoul(const_start, &endptr, 10);
+//        printf("reading from %s gives %d\n", const_start, value);
+    return value;
+}
+
 uint32_t read_const32(char *line, int offset) {
     char *const_start = line + nonspace(line, offset);
     char *endptr;
@@ -230,6 +238,7 @@ uint32_t op_reg_const(char *line, int op_end, int opcode, uint32_t *dest) {
         return size;
 }
 
+
 uint32_t op_reg_float(char *line, int op_end, int opcode, uint32_t *dest) {
         int reg1 = read_register(line, op_end);
         int comma = find(line, ',', op_end);
@@ -252,16 +261,23 @@ uint32_t op_const(char *line, int op_end, int opcode, uint32_t *dest) {
         int cond = read_cond(line);
         int size = GET_SIZE(opcode);
         int offset = nonspace(line, op_end);
-        *dest = opcode << 22 | cond << 16;
-        if (size == 2) {
-            uint32_t value = read_const32(line, offset);
-//            printf("got size %d, value %d\n", size, value);
-            *(dest + 1) = value;
+        if (size == 1) {
+            uint8_t value = read_const8(line, offset);
+            *dest = opcode << 22 | cond << 16 | value;
         }
-        else if (size == 3) {
-            uint64_t value = read_const64(line, offset);
-//            printf("got size %d, value %lld\n", size, value);
-            *((uint64_t *)(dest + 1)) = value;
+        else
+        {
+            *dest = opcode << 22 | cond << 16;
+            if (size == 2) {
+                uint32_t value = read_const32(line, offset);
+//             printf("got size %d, value %d\n", size, value);
+                *(dest + 1) = value;
+            }
+            else if (size == 3) {
+                uint64_t value = read_const64(line, offset);
+//             printf("got size %d, value %lld\n", size, value);
+                *((uint64_t *)(dest + 1)) = value;
+            }
         }
         return size;
 }
@@ -312,9 +328,33 @@ HashMap *create_instructions() {
     add_instr(map, "LOAD", LOAD, &op_reg_reg);
     add_instr(map, "LOAD32", LOAD32, &op_reg_const);
     add_instr(map, "LOAD64", LOAD64, &op_reg_const);
+    add_instr(map, "INTTOFLOAT", INTTOFLOAT, &op_reg_reg);
+    add_instr(map, "FLOATTOINT", FLOATTOINT, &op_reg_reg);
+    add_instr(map, "SHIFTLEFT", SHIFTLEFT, &op_reg_reg);
+    add_instr(map, "SHIFTRIGHT", SHIFTRIGHT, &op_reg_reg);
+    add_instr(map, "ROTLEFT", ROTLEFT, &op_reg_reg);
+    add_instr(map, "ROTRIGHT", ROTRIGHT, &op_reg_reg);
+    add_instr(map, "COMPARE", COMPARE, &op_reg_reg);
+    add_instr(map, "LOADBYTE", LOADBYTE, &op_reg_reg);
+    add_instr(map, "LOADCONSTBYTE", LOADCONSTBYTE, &op_reg_const);
+
+
+    add_instr(map, "NEGATE", NEGATE, &op_reg_reg);
     add_instr(map, "ADD", ADD, &op_reg_reg);
+    add_instr(map, "ADD32", ADD32, &op_reg_const);
+    add_instr(map, "ADD64", ADD64, &op_reg_const);
     add_instr(map, "SUBTRACT", SUBTRACT, &op_reg_reg);
+    add_instr(map, "SUBTRACT32", SUBTRACT32, &op_reg_const);
+    add_instr(map, "SUBTRACT64", SUBTRACT64, &op_reg_const);
+    add_instr(map, "MULTIPLY", MULTIPLY, &op_reg_reg);
+    add_instr(map, "MULTIPLY32", MULTIPLY32, &op_reg_const);
+    add_instr(map, "MULTIPLY64", MULTIPLY64, &op_reg_const);
+    add_instr(map, "DIVIDE", SUBTRACT, &op_reg_reg);
+    add_instr(map, "DIVIDE32", DIVIDE32, &op_reg_const);
+    add_instr(map, "DIVIDE64", DIVIDE64, &op_reg_const);
+
     add_instr(map, "LOADFLOAT", LOADFLOAT, &op_reg_float);
+    add_instr(map, "NEGATEFLOAT", NEGATEFLOAT, &op_reg_float);
     add_instr(map, "ADDFLOAT", ADDFLOAT, &op_reg_reg);
     add_instr(map, "ADDFLOAT64", ADDFLOAT64, &op_reg_float);
     add_instr(map, "SUBTRACTFLOAT", SUBTRACTFLOAT, &op_reg_reg);
@@ -323,8 +363,27 @@ HashMap *create_instructions() {
     add_instr(map, "MULTIPLYFLOAT64", MULTIPLYFLOAT64, &op_reg_float);
     add_instr(map, "DIVIDEFLOAT", DIVIDEFLOAT, &op_reg_reg);
     add_instr(map, "DIVIDEFLOAT64", DIVIDEFLOAT64, &op_reg_float);
-    add_instr(map, "FLOATTOINT", FLOATTOINT, &op_reg_reg);
-    add_instr(map, "INTTOFLOAT", INTTOFLOAT, &op_reg_reg);
+
+    add_instr(map, "NOT", NOT, &op_reg_reg);
+    add_instr(map, "AND", AND, &op_reg_reg);
+    add_instr(map, "AND32", AND32, &op_reg_const);
+    add_instr(map, "AND64", AND64, &op_reg_const);
+    add_instr(map, "NAND", NAND, &op_reg_reg);
+    add_instr(map, "NAND32", NAND32, &op_reg_const);
+    add_instr(map, "NAND64", NAND64, &op_reg_const);
+    add_instr(map, "OR", OR, &op_reg_reg);
+    add_instr(map, "OR32", OR32, &op_reg_const);
+    add_instr(map, "OR64", OR64, &op_reg_const);
+    add_instr(map, "NOR", NOR, &op_reg_reg);
+    add_instr(map, "NOR32", NOR32, &op_reg_const);
+    add_instr(map, "NOR64", NOR64, &op_reg_const);
+    add_instr(map, "XOR", XOR, &op_reg_reg);
+    add_instr(map, "XOR32", XOR32, &op_reg_const);
+    add_instr(map, "XOR64", XOR64, &op_reg_const);
+    add_instr(map, "XNOR", XNOR, &op_reg_reg);
+    add_instr(map, "XNOR32", XNOR32, &op_reg_const);
+    add_instr(map, "XNOR64", XNOR64, &op_reg_const);
+
     return map;
 }
 
