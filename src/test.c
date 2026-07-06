@@ -237,6 +237,7 @@ void test_cond(HashMap *is, Vm * vm) {
     size += assemble(is, "LOADBYTECONST R1, 5 IFNP", dest + size);
     size += assemble(is, "LOADBYTECONST R2, 5 IFNN", dest + size);
     size += assemble(is, "LOAD32 R3, 0", dest + size);
+
     size += assemble(is, "MULTIPLY R3, R0", dest + size);
     size += assemble(is, "LOADBYTECONST R4, 7 IFNZ", dest + size);
 
