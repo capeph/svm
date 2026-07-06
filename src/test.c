@@ -228,19 +228,48 @@ void test_float(HashMap *is, Vm *vm) {
     verify(35, vm->reg[0], "conversion");
 }
 
+
+void test_cond(HashMap *is, Vm * vm) {
+    reset(vm);
+    uint32_t *dest = (uint32_t *)vm->memory;
+    int size = 0;
+    size += assemble(is, "LOADBYTECONST R0, 12", dest);
+    size += assemble(is, "LOADBYTECONST R1, 5 IFNP", dest + size);
+    size += assemble(is, "LOADBYTECONST R2, 5 IFNN", dest + size);
+    size += assemble(is, "LOAD32 R3, 0", dest + size);
+    size += assemble(is, "MULTIPLY R3, R0", dest + size);
+    size += assemble(is, "LOADBYTECONST R4, 7 IFNZ", dest + size);
+
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+    vm->pc = interpret(vm);
+
+    verify(12, get_reg(vm, 0), "load");
+    verify(0, get_reg(vm, 1), "IFNP");
+    verify(5, get_reg(vm, 2), "IFNN");
+    verify(0, get_reg(vm, 3), "multiply");
+    verify(0, get_reg(vm, 4), "IFNZ");
+
+
+}
+
 int run_tests(Vm *vm)
 {
     HashMap *is = create_instructions();
-//    test_hashmap();
-//    test_nonspace();
-//    test_space();
-//    test_match();
+    test_hashmap();
+    test_nonspace();
+    test_space();
+    test_match();
     test_assembly(is);
     test_load(is, vm);
     test_add(is, vm);
     test_sub(is, vm);
     test_ahead_back(is, vm);
     test_float(is, vm);
+    test_cond(is, vm);
     destroy_instructions(is);
     return 0;
 }

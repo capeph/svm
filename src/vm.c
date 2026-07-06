@@ -96,7 +96,7 @@ void set_reg(Vm *vm, uint8_t reg, int64_t value) {
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-//        printf("setting reg %x to %lld\n", reg, value);
+//        printf("setting reg %x to int %lld\n", reg, value);
         vm->reg[reg] = value;
     }
 }
@@ -115,7 +115,7 @@ void set_reg_double(Vm *vm, uint8_t reg, double value) {
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-//        printf("setting reg %x to %f\n", reg, value);
+//        printf("setting reg %x to float %f\n", reg, value);
         memcpy(&vm->reg[reg], &value, sizeof(value));
     }
 }
@@ -135,7 +135,7 @@ void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
         memcpy(vm->memory + regval, &value, sizeof(value));
     }
     else {
-//        printf("setting reg %d to %d\n", reg, value);
+//        printf("setting reg %d to byte %d\n", reg, value);
         vm->reg[reg] = value;
     }
 }
@@ -144,14 +144,17 @@ void set_byte(Vm *vm, uint8_t reg, uint8_t value) {
 void set_flags(Vm *vm, int64_t value)
 {
     if (value == 0) {
-        vm->flags = 1 << ZERO_FLAG;
+        vm->flags = ZERO_FLAG;
+//        printf("setting ZERO, %x\n", vm->flags);
     }
     else {
         if (value < 0) {
-            vm->flags = 1 << NEGATIVE_FLAG;
+            vm->flags = NEGATIVE_FLAG;
+//            printf("setting NEGATIVE, %x\n", vm->flags);
         }
         else {
-            vm->flags = 1 << POSITIVE_FLAG;
+            vm->flags = POSITIVE_FLAG;
+//            printf("setting POSITIVE, %x\n", vm->flags);
         }
     }
 }
@@ -174,21 +177,6 @@ void set_flags_double(Vm *vm, double value)
 
 void set_overflow(Vm *vm) {
     vm->flags = 1 << OVERFLOW_FLAG;
-}
-
-void set_double_flags(Vm *vm, double value)
-{
-    if (value == 0) {
-        vm->flags = 1 << ZERO_FLAG;
-    }
-    else {
-        if (value < 0) {
-            vm->flags = 1 << NEGATIVE_FLAG;
-        }
-        else {
-            vm->flags = 1 << POSITIVE_FLAG;
-        }
-    }
 }
 
 
@@ -253,8 +241,8 @@ void set_pc(Vm *vm, uint64_t pc) {
 void reset(Vm *vm) {
     vm->pc = 0;
     vm->run = false;
-    memset(vm->memory, vm->mem_size, sizeof(uint8_t));
-    memset(vm->reg, 128, sizeof(int64_t));
+    memset(vm->memory, 0, vm->mem_size);
+    memset(vm->reg, 0, sizeof(vm->reg));
 }
 
 void run(Vm *vm, uint64_t start) {

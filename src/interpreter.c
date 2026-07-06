@@ -23,6 +23,7 @@ uint64_t interpret(Vm *vm) {
     uint32_t instruction = *instrp;
     int size = SIZE(instruction);
     uint64_t new_pc = vm->pc + size * sizeof(uint32_t);
+//    printf("instruction flags: %x, vm flags: %x\n", FLAGS(instruction), vm->flags);
     if (FLAGS(instruction) & vm->flags)
     {   // conditional skip
         return new_pc;
@@ -148,12 +149,15 @@ uint64_t interpret(Vm *vm) {
     {
         uint8_t byte = get_byte(vm, DATA(instruction));
         set_byte(vm, TARGET(instruction), byte);
+        set_flags(vm, byte);
         break;
     }
-    case LOADCONSTBYTE :
+    case LOADBYTECONST :
     {   // use the data register bits for the byte constant
         uint8_t byte = DATA(instruction);
+//        printf("got byte %d\n", byte);
         set_byte(vm, TARGET(instruction), byte);
+        set_flags(vm, byte);
         break;
     }
     case LOAD :

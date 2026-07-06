@@ -35,24 +35,22 @@ condition   0 - no condition
 
 opcodes are:
 load        load the value from data into target
-            if const flag is used, the value from next instruction field(s) are loaded
-            into target instead. the PC in increased appropriately
-            error flag is set if data or target is outside of available space
-            positive, negative or zero is set based on the value
+load32      load a 32 bit constant into target
+load64      load a 64 bit constant into target
 ahead       use the value of the target and data together as a 16 bit offset to be added to the PC
-            error flag is set if target is outside of available space
 back        use the value of the target and data together as a 16 bit offset to be subtracted from the PC
-            error flag is set if target is outside of available space
 jump        jump to the value in target data is ignored
-            if const flag is used the value from the following instructions fields are loaded instead and target is ignored
-            error flag is set if target is outside of available space
+jump32      jump to a 32 bit address, registers are ignored
+jump64      jump to a 64 bit address registers are ignored
+
+
 branch      conditional jump to target based on the value in data
             if const flag is used the value from the following instructions fields are loaded instead and target is ignored
             error flag is set if target is outside of available space
 call        jump to the value in target the pc is stored into data
             if const flag is used the value from the following instructions fields are loaded instead
             error flag is set if target is outside of available space
-add
+add         add the value
 subtract
 multiply
 divide

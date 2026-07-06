@@ -7,8 +7,8 @@
 /* Flags */
 
 #define ZERO_FLAG  1
-#define POSITIVE_FLAG 2
-#define NEGATIVE_FLAG 4
+#define NEGATIVE_FLAG 2
+#define POSITIVE_FLAG 4
 #define OVERFLOW_FLAG 8;
 
 

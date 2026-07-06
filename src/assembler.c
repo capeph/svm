@@ -103,30 +103,37 @@ int read_cond(char *line)
 {
     int len = strlen(line);
     int startpos = -1;
-    for (int i = len; i > 5; i--) {
-        if (strncmp(line + i - 3, " IF", 3)) {
+    for (int i = len-5; i > 5; i--) {
+        if (strncmp(line + i, " IFN", 4) == 0) {
             startpos = i;
+            break;
         }
     }
+//    printf("startpos %d\n", startpos);
     if (startpos == -1) {
+//        printf("flags: 00\n");
         return 0;
     }
     int flags = 0;
-    for (int i = startpos; i < len; i++)
+    for (int i = startpos+4; i < len; i++)
     {
         if (line[i] == 'Z') {
             flags |= 1;
+//            printf("found ZERO at %d: %x\n", i, flags);
         }
         else if (line[i] == 'N') {
+//            printf("found NEGATIVE at %d: %x\n", i, flags);
             flags |= 2;
         }
         else if (line[i] == 'P') {
+//            printf("found POSITIV at %d: %x\n", i, flags);
             flags |= 4;
         }
         else {
             break;
         }
     }
+//    printf("flags: %x\n", flags);
     return flags;
 }
 
@@ -224,16 +231,22 @@ uint32_t op_reg_const(char *line, int op_end, int opcode, uint32_t *dest) {
         int comma = find(line, ',', op_end);
         int cond = read_cond(line);
         int size = GET_SIZE(opcode);
-        *dest = opcode << 22 | cond << 16 | reg1 << 8;
-        if (size == 2) {
-            uint32_t value = read_const32(line, comma + 1);
-//            printf("got size %d, value %d\n", size, value);
-            *(dest + 1) = value;
+        if (size == 1) {
+            uint8_t value = read_const8(line, comma +1);
+            *dest = opcode << 22 | cond << 16 | reg1 << 8 | value;
         }
-        else if (size == 3) {
-            uint64_t value = read_const64(line, comma + 1);
-//            printf("got size %d, value %lld\n", size, value);
-            *((uint64_t *)(dest + 1)) = value;
+        else {
+            *dest = opcode << 22 | cond << 16 | reg1 << 8;
+            if (size == 2) {
+                uint32_t value = read_const32(line, comma + 1);
+//                printf("got size %d, value %d\n", size, value);
+                *(dest + 1) = value;
+            }
+            else if (size == 3) {
+                uint64_t value = read_const64(line, comma + 1);
+//                printf("got size %d, value %lld\n", size, value);
+                *((uint64_t *)(dest + 1)) = value;
+            }
         }
         return size;
 }
@@ -336,7 +349,7 @@ HashMap *create_instructions() {
     add_instr(map, "ROTRIGHT", ROTRIGHT, &op_reg_reg);
     add_instr(map, "COMPARE", COMPARE, &op_reg_reg);
     add_instr(map, "LOADBYTE", LOADBYTE, &op_reg_reg);
-    add_instr(map, "LOADCONSTBYTE", LOADCONSTBYTE, &op_reg_const);
+    add_instr(map, "LOADBYTECONST", LOADBYTECONST, &op_reg_const);
 
 
     add_instr(map, "NEGATE", NEGATE, &op_reg_reg);
