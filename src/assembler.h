@@ -14,5 +14,6 @@ void destroy_instructions(HashMap *map);
 
 uint32_t assemble(HashMap *builders, char *instruction, uint32_t *dest);
 
+int assemble_file(char *filename, char *outfilename);
 
 #endif

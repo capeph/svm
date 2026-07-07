@@ -13,6 +13,8 @@
 #define BUILDOPCODE(group, number, size) ((group << 7) | (number << 2) | size)
 #define GET_SIZE(opcode) opcode & 3;
 
+#define START BUILDOPCODE(FLOW, 25, 1)
+
 #define HALT BUILDOPCODE(FLOW, 0, 1)
 #define AHEAD BUILDOPCODE(FLOW, 1, 1)
 #define BACK BUILDOPCODE(FLOW, 2, 1)

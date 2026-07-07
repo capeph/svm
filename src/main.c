@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "vm.h"
 #include "test.h"
+#include "assembler.h"
 
 
 void usage_err(char *error)
@@ -51,7 +52,14 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         usage_err(NULL);
     }
-    char* program = argv[1];
+    if (strcmp("-t", argv[1]) == 0)
+    {
+        Vm *vm = create_vm(DEFAULT_SIZE);
+        return run_tests(vm);
+    }
+    if (strcmp("-a", argv[1]) == 0) {
+        return assemble_file(argv[2], argv[3])
+    }
     if (strcmp("-s", argv[1]) == 0)
     {
         if (argc < 4) {
@@ -63,9 +71,8 @@ int main(int argc, char* argv[]) {
         }
         program = argv[3];
     }
-    if (strcmp("-t", argv[1]) == 0)
-    {
-        program = NULL;
+    else {
+        program = argv[1]
     }
 
 

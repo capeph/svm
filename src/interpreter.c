@@ -17,7 +17,6 @@
 
 #define SIZE(instruction) ((instruction >> 22 ) & 3) // size is low bits of the opcode
 
-
 uint64_t interpret(Vm *vm) {
     uint32_t *instrp = (uint32_t *)(vm->memory + vm->pc);
     uint32_t instruction = *instrp;

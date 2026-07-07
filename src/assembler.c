@@ -419,3 +419,38 @@ uint32_t assemble(HashMap *codes, char *line, uint32_t *dest) {
     }
     return size;
 }
+
+// TODO: patch addresses
+// label starting with ':' marks a destination
+// during assembly destinations should be collected in a map, name->position
+// if a known address is encountered it should be replaced by the adjusted offset
+// if an unknown address is encountered, the position is recorded + size (for 16bit) in a list of unknowns
+// when a label matching unknows are found, they should be back-patched
+// back-patch: save current, fseek position, write bytes
+
+int assemble_file(char *asmfile, char *outfilename)
+{
+    FILE *file = fopen(asmfile, "r");
+    if (file == NULL) {
+        printf("provide a valid file\n");
+        exit(-1);
+    }
+    FILE *outfile = fopen(outfilename, "wb");
+    if (outfile == NULL) {
+        printf("failed to open outfile\n");
+        fclose(file);
+    }
+    char buffer[256];
+    uint32_t output[10];   // deduce size!
+
+    int size = 0;
+    HashMap *is = create_instructions();
+    while (fgets(buffer, sizeof(buffer), file) != NULL) {
+        size = assemble(is, buffer, output);
+        fwrite(output, sizeof(uint32_t), size, outfile);
+    }
+    fclose(file);
+    fclose(outfile);
+    destroy_instructions(is);
+    FILE *out =
+}
