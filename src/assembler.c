@@ -428,6 +428,10 @@ uint32_t assemble(HashMap *codes, char *line, uint32_t *dest) {
 // when a label matching unknows are found, they should be back-patched
 // back-patch: save current, fseek position, write bytes
 
+// TODO: data
+// a keword, to define a sequence of bytes
+// or a string
+
 int assemble_file(char *asmfile, char *outfilename)
 {
     FILE *file = fopen(asmfile, "r");
@@ -452,5 +456,4 @@ int assemble_file(char *asmfile, char *outfilename)
     fclose(file);
     fclose(outfile);
     destroy_instructions(is);
-    FILE *out =
 }

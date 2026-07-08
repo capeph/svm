@@ -58,8 +58,9 @@ int main(int argc, char* argv[]) {
         return run_tests(vm);
     }
     if (strcmp("-a", argv[1]) == 0) {
-        return assemble_file(argv[2], argv[3])
+        return assemble_file(argv[2], argv[3]);
     }
+    char *program;
     if (strcmp("-s", argv[1]) == 0)
     {
         if (argc < 4) {
@@ -72,16 +73,11 @@ int main(int argc, char* argv[]) {
         program = argv[3];
     }
     else {
-        program = argv[1]
+        program = argv[1];
     }
 
 
     Vm *vm = create_vm(mem_size);
-
-    if (program == NULL)
-    {
-        return run_tests(vm);
-    }
 
 
     int size = load(program, vm);
