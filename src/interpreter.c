@@ -28,15 +28,18 @@ uint64_t interpret(Vm *vm) {
         return new_pc;
     }
     int opcode = OPCODE(instruction);
-//    printf("Opcode is %d (%x), size is %d\n", opcode, opcode, size);
+    printf("Opcode is %x, size is %d, pc=%lld\n", opcode, size, vm->pc);
 
     switch (opcode) {
     case HALT :
         printf("System halted\n");
         vm->run = false;
      case AHEAD :
+     {
         new_pc = vm->pc + OFFSET(instruction);
+        printf("AHEAD to %lld\n", new_pc);
         break;
+     }
     case BACK :
     {
         uint64_t offset = OFFSET(instruction);
@@ -45,6 +48,7 @@ uint64_t interpret(Vm *vm) {
             exit(-1);
         }
         new_pc = vm->pc - offset;
+        printf("BACK to %lld  (%lld, %lld)\n", new_pc, vm->pc, offset);
         break;
     }
     case JUMP :
@@ -53,7 +57,7 @@ uint64_t interpret(Vm *vm) {
     case JUMP32 :
     case JUMP64 :
         new_pc = get_const(vm, size);
-//        printf("got const %lld\n", new_pc);
+        printf("JUMPxx to %lld\n", new_pc);
         break;
     case JUMPZERO :
         set_flags(vm, get_reg(vm, DATA(instruction)));
@@ -651,10 +655,11 @@ uint64_t interpret(Vm *vm) {
     }
     }
 
-    if (new_pc * sizeof(uint32_t) > vm->mem_size) {
+    if (new_pc  > vm->mem_size) {
         printf("instruction overrun new_pc=%lld", new_pc);
         exit(-1);
     }
+    printf("new pc is set to %llu\n", new_pc);
     return new_pc;
 
 

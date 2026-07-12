@@ -9,6 +9,7 @@ typedef struct {
     HashMap *refs;  //str->ReferenceUsages
     HashMap *strcache;  // cache for strings see util.h
     HashMap *is;
+    uint64_t written;  // number of bytes produced
 } Context;
 
 int nonspace(char *str, int start);

@@ -79,6 +79,19 @@ void test_match()
     verify(true, match("LOAD", "    LOAD  ", 4, 8), "match first");
 }
 
+void test_basic(Context *context)
+{
+    uint32_t code[100];
+    context->dest = code;
+    context->written = 0;
+    verify(1, assemble(context, " LOAD [R1] , R2"), "singleop");
+    verify_hex(0x21408102, code[0], "LOAD [R1], R2");
+    assemble(context, " LOAD R127 , [R88]");
+    verify_hex(0x21407fd8, code[1], "LOAD R127, [R88]");
+}
+
+
+
 void test_assembly(Context *context)
 {
 
@@ -120,6 +133,7 @@ int64_t get_mem(Vm *vm, uint64_t offset)
 void test_load(Context *context, Vm *vm)
 {
     reset(vm);
+    context->written = 0;
     //inject some code to test;
     context->dest = (uint32_t *)vm->memory;
     assemble(context, "  LOAD R1, [R2]");
@@ -140,6 +154,8 @@ void test_load(Context *context, Vm *vm)
 int test_add(Context *context, Vm *vm)
 {
     reset(vm);
+    context->written = 0;
+
     //inject some code to test;
     context->dest = (uint32_t *)vm->memory;
     assemble(context, " LOAD R3, [R1]");
@@ -166,16 +182,23 @@ int test_add(Context *context, Vm *vm)
 int test_ahead_back(Context *context, Vm *vm)
 {
     reset(vm);
+    context->written = 0;
+
     //inject some code to test;
-    context->dest = (uint32_t *)vm->memory;
+    context->dest = vm->memory;
     assemble(context, " AHEAD 512");
     assemble(context, " BACK 4");
     assemble(context, " JUMP64 1024");
 
     vm->pc = interpret(vm);
+    printf("a\n");
     verify(512, vm->pc, "ahead");
+    printf("b\n");
     vm->pc = 4;
+    printf("c\n");
     vm->pc = interpret(vm);
+    printf("d\n");
+
     verify(0, vm->pc, "back");
     vm->pc = 8;
     vm->pc = interpret(vm);
@@ -188,6 +211,8 @@ int test_ahead_back(Context *context, Vm *vm)
 int test_sub(Context *context, Vm *vm)
 {
     reset(vm);
+    context->written = 0;
+
     //inject some code to test;
     context->dest = (uint32_t *)vm->memory;
     assemble(context, " LOAD R3, [R1]");
@@ -211,6 +236,8 @@ int test_sub(Context *context, Vm *vm)
 
 void test_float(Context *context, Vm *vm) {
     reset(vm);
+    context->written = 0;
+
         //inject some code to test;
     context->dest = (uint32_t *)vm->memory;
     assemble(context, " LOADFLOAT R1, 25.3");
@@ -228,6 +255,8 @@ void test_float(Context *context, Vm *vm) {
 
 void test_cond(Context *context, Vm * vm) {
     reset(vm);
+    context->written = 0;
+
     context->dest = (uint32_t *)vm->memory;
     assemble(context, "LOADBYTECONST R0, 12");
     assemble(context, "LOADBYTECONST R1, 5 IFNP");
@@ -258,18 +287,21 @@ int run_tests(Vm *vm)
     Context context;
     context.is = create_instructions();
     context.strcache = create_map(100);
+    context.written = 0;
 
 //    test_hashmap();
 //    test_nonspace();
 //    test_space();
 //    test_match();
-//    test_assembly(&context);
-//    test_load(&context, vm);
-//    test_add(&context, vm);
-//    test_sub(&context, vm);
-//    test_ahead_back(&context, vm);
+//    test_basic(&context);
+
+    test_assembly(&context);
+    test_load(&context, vm);
+    test_add(&context, vm);
+    test_sub(&context, vm);
+    test_ahead_back(&context, vm);
     test_float(&context, vm);
     test_cond(&context, vm);
-//    destroy_instructions(context.is);
+    destroy_instructions(context.is);
     return 0;
 }

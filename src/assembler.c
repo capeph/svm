@@ -150,17 +150,22 @@ int read_cond(char *line)
 // offset in bytes
 void write_32(Context *context, uint32_t instr, int offset)
 {
-    *((uint32_t *)(context->dest + offset)) = instr;
+    void *writeptr = context->dest + context->written + offset;
+//    printf("writing32 %x to %p (%p, %lld %d)\n", instr, writeptr, context->dest, context->written, offset);
+    *((uint32_t *)writeptr) = instr;
 }
 
 void write_64(Context *context, uint64_t value, int offset)
 {
-    *((uint64_t *)(context->dest + offset)) = value;
+    void *writeptr = context->dest + context->written + offset;
+//    printf("writing64 %llx to %p\n", value, writeptr);
+    *((uint64_t *)writeptr) = value;
 }
 
 void write_double(Context *context, double value, int offset)
 {
-    *((double *)(context->dest + offset)) = value;
+    void *writeptr = context->dest + context->written + offset;
+    *((double *)writeptr) = value;
 }
 
 
@@ -461,9 +466,10 @@ uint32_t assemble(Context *context, char *line) {
     int size = builder->emitter(line, op_end, builder->opcode, context);
     printf("parsed: %s\n", line);
     for(int i = 0; i < size; i++) {
-        printf("emitted %d of %d: %x\n", i, size, *((uint32_t *)(context->dest) + i));
+        printf("emitted %d of %d: %x\n", i, size, *(((uint32_t *)(context->dest + context->written)) + i));
     }
-    context->dest += size * sizeof(uint32_t);
+    long bytes_written = size * sizeof(uint32_t);
+    context->written += bytes_written;
     return size;
 }
 
