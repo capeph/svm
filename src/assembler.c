@@ -1,18 +1,21 @@
-#include <_string.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <sys/_types/_u_int32_t.h>
+#include <sys/types.h>
 #include "hashmap.h"
 #include "opcodes.h"
 #include "assembler.h"
+#include "utils.h"
+#include "references.h"
 
 typedef struct {
     char *name;
     int opcode;
-    uint32_t (*emitter)(char *, int, int, uint32_t *);
+    uint32_t (*emitter)(char *, int, int, Context *);
 } Builder;
 
 
@@ -89,14 +92,21 @@ int read_register(char *str, int start) {
 }
 
 
-uint16_t read_offset(char *str, int start) {
+uint16_t read_offset(char *str, int start, Context *context) {
     if (start == -1) {
         printf("assembly failed for %s: expected offset at %d\n", str, start);
         exit(-1);
     }
     int offset_start = nonspace(str, start);
-    long num = strtoul(str+offset_start, NULL, 10);
-    return (uint16_t)num;
+    if(isdigit(str[offset_start])) {
+        long num = strtoul(str+offset_start, NULL, 10);
+        return (uint16_t)num;
+    }
+    else {
+        printf("not supported\n");
+        exit (-1);
+    }
+
 }
 
 int read_cond(char *line)
@@ -137,8 +147,25 @@ int read_cond(char *line)
     return flags;
 }
 
+// offset in bytes
+void write_32(Context *context, uint32_t instr, int offset)
+{
+    *((uint32_t *)(context->dest + offset)) = instr;
+}
+
+void write_64(Context *context, uint64_t value, int offset)
+{
+    *((uint64_t *)(context->dest + offset)) = value;
+}
+
+void write_double(Context *context, double value, int offset)
+{
+    *((double *)(context->dest + offset)) = value;
+}
+
+
 void add_instr(HashMap *map, char *name,
-    int opcode, uint32_t (*emitter)(char *, int, int, uint32_t *)) {
+    int opcode, uint32_t (*emitter)(char *, int, int, Context *)) {
     Builder *builder = malloc(sizeof(Builder));
     builder->name = name;
     builder->opcode = opcode;
@@ -146,35 +173,35 @@ void add_instr(HashMap *map, char *name,
     put_map(map, name, builder);
 }
 
-uint32_t op_no_reg(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_no_reg(char *line, int op_end, int opcode, Context *context) {
     int cond = read_cond(line);
-    *dest = opcode << 22 | cond << 16;
+    write_32(context, opcode << 22 | cond << 16, 0);
     return 1;
 }
 
 
-uint32_t op_with_offset(char *line, int op_end, int opcode, uint32_t *dest) {
-    uint16_t offset = read_offset(line, op_end);
+uint32_t op_with_offset(char *line, int op_end, int opcode, Context *context) {
+    uint16_t offset = read_offset(line, op_end, context);
     int cond = read_cond(line);
-    *dest = opcode << 22 | cond << 16 | offset;
+    write_32(context, opcode << 22 | cond << 16 | offset, 0);
     return 1;
 }
 
-uint32_t op_one_reg(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_one_reg(char *line, int op_end, int opcode, Context *context) {
     int reg1 = read_register(line, op_end);
     int cond = read_cond(line);
-    *dest = opcode << 22 | cond << 16 | reg1 << 8;
+    write_32(context, opcode << 22 | cond << 16 | reg1 << 8, 0);
     return 1;
 }
 
 
-uint32_t op_reg_reg(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_reg_reg(char *line, int op_end, int opcode, Context *context) {
     int reg1 = read_register(line, op_end);
     int comma = find(line, ',', op_end);
     int reg2 = read_register(line, comma + 1);
     int cond = read_cond(line);
 //    printf("op_reg_reg %d %d %d: %s\n", opcode, reg1, reg2, line);
-    *dest = opcode << 22 | cond << 16 | reg1 << 8 | reg2;
+    write_32(context, opcode << 22 | cond << 16 | reg1 << 8 | reg2, 0);
     return 1;
 }
 
@@ -187,7 +214,7 @@ uint8_t read_const8(char *line, int offset) {
     return value;
 }
 
-uint32_t read_const32(char *line, int offset) {
+uint32_t read_const32(char *line, int offset, Context *context) {
     char *const_start = line + nonspace(line, offset);
     char *endptr;
     uint32_t value;
@@ -202,7 +229,7 @@ uint32_t read_const32(char *line, int offset) {
     return value;
 }
 
-uint64_t read_const64(char *line, int offset) {
+uint64_t read_const64(char *line, int offset, Context *context) {
     char *const_start = line + nonspace(line, offset);
     char *endptr;
     uint64_t value;
@@ -210,9 +237,27 @@ uint64_t read_const64(char *line, int offset) {
         int64_t val = (int64_t)strtoll(const_start, &endptr, 10);
         memcpy(&value, &val, sizeof(val));
     }
-    else {
+    else if (isdigit(const_start[0])) {
         value = strtoull(const_start, &endptr, 10);
     }
+    else {
+        int end = space(const_start, 0);
+        if (end == -1) {
+            end = find(const_start, ',', 0);
+        }
+        if (end == -1) {
+            end = strlen(const_start) - 1;
+        }
+        char *label = get_str(context->strcache, const_start, 0, end);
+//        ReferenceUsages *ref = add_reference(context->refs, label, context->dest, 2);
+
+
+        value = 0;
+
+
+
+    }
+
     return value;
 }
 
@@ -226,33 +271,33 @@ double read_const_double(char *line, int offset) {
     return value;
 }
 
-uint32_t op_reg_const(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_reg_const(char *line, int op_end, int opcode, Context *context) {
         int reg1 = read_register(line, op_end);
         int comma = find(line, ',', op_end);
         int cond = read_cond(line);
         int size = GET_SIZE(opcode);
         if (size == 1) {
             uint8_t value = read_const8(line, comma +1);
-            *dest = opcode << 22 | cond << 16 | reg1 << 8 | value;
+            write_32(context, opcode << 22 | cond << 16 | reg1 << 8 | value, 0);
         }
         else {
-            *dest = opcode << 22 | cond << 16 | reg1 << 8;
+            write_32(context, opcode << 22 | cond << 16 | reg1 << 8, 0);
             if (size == 2) {
-                uint32_t value = read_const32(line, comma + 1);
+                uint32_t value = read_const32(line, comma + 1, context);
 //                printf("got size %d, value %d\n", size, value);
-                *(dest + 1) = value;
+                write_32(context, value, sizeof(uint32_t));
             }
             else if (size == 3) {
-                uint64_t value = read_const64(line, comma + 1);
+                uint64_t value = read_const64(line, comma + 1, context);
 //                printf("got size %d, value %lld\n", size, value);
-                *((uint64_t *)(dest + 1)) = value;
+                write_64(context, value, sizeof(uint32_t));
             }
         }
         return size;
 }
 
 
-uint32_t op_reg_float(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_reg_float(char *line, int op_end, int opcode, Context *context) {
         int reg1 = read_register(line, op_end);
         int comma = find(line, ',', op_end);
         int cond = read_cond(line);
@@ -261,35 +306,35 @@ uint32_t op_reg_float(char *line, int op_end, int opcode, uint32_t *dest) {
             printf("Malformed opcode\n");
             exit(-1);
         }
-        *dest = opcode << 22 | cond << 16 | reg1 << 8;
+        write_32(context, opcode << 22 | cond << 16 | reg1 << 8, 0);
         double value = read_const_double(line, comma + 1);
 //            printf("got size %d, value %f\n", size, value);
-        *((double *)(dest + 1)) = value;
+        write_double(context, value, sizeof(uint32_t));
 
         return size;
 }
 
 // Nooo... we are wasting 16 bits / two registers
-uint32_t op_const(char *line, int op_end, int opcode, uint32_t *dest) {
+uint32_t op_const(char *line, int op_end, int opcode, Context *context) {
         int cond = read_cond(line);
         int size = GET_SIZE(opcode);
         int offset = nonspace(line, op_end);
         if (size == 1) {
             uint8_t value = read_const8(line, offset);
-            *dest = opcode << 22 | cond << 16 | value;
+            write_32(context, opcode << 22 | cond << 16 | value, 0);
         }
         else
         {
-            *dest = opcode << 22 | cond << 16;
+            write_32(context, opcode << 22 | cond << 16, 0);
             if (size == 2) {
-                uint32_t value = read_const32(line, offset);
+                uint32_t value = read_const32(line, offset, context);
 //             printf("got size %d, value %d\n", size, value);
-                *(dest + 1) = value;
+                write_32(context, value, sizeof(uint32_t));
             }
             else if (size == 3) {
-                uint64_t value = read_const64(line, offset);
+                uint64_t value = read_const64(line, offset, context);
 //             printf("got size %d, value %lld\n", size, value);
-                *((uint64_t *)(dest + 1)) = value;
+                write_64(context, value, sizeof(uint32_t));
             }
         }
         return size;
@@ -401,22 +446,24 @@ HashMap *create_instructions() {
 }
 
 
-uint32_t assemble(HashMap *codes, char *line, uint32_t *dest) {
+
+uint32_t assemble(Context *context, char *line) {
     char opcode[25];
     int op_start = nonspace(line, 0);
     int op_end = space(line, op_start);
     memcpy(opcode, line + op_start, op_end);
     opcode[op_end - op_start] = '\0';
 //    printf("got opcode %s\n", opcode);
-    Builder *builder = get_map(codes, opcode);
+    Builder *builder = get_map(context->is, opcode);
     if (builder == NULL) {
         printf("Unknown opcode %s\n", opcode);
     }
-    int size = builder->emitter(line, op_end, builder->opcode, dest);
+    int size = builder->emitter(line, op_end, builder->opcode, context);
     printf("parsed: %s\n", line);
     for(int i = 0; i < size; i++) {
-        printf("emitted %d of %d: %x\n", i, size, *(dest + i));
+        printf("emitted %d of %d: %x\n", i, size, *((uint32_t *)(context->dest) + i));
     }
+    context->dest += size * sizeof(uint32_t);
     return size;
 }
 
@@ -449,11 +496,16 @@ int assemble_file(char *asmfile, char *outfilename)
 
     int size = 0;
     HashMap *is = create_instructions();
+    Context context;
+    context.is = is;
+    context.strcache = create_map(1000);   // calculate from file size
     while (fgets(buffer, sizeof(buffer), file) != NULL) {
-        size = assemble(is, buffer, output);
+        context.dest = output;   // reset output!
+        size = assemble(&context, buffer);
         fwrite(output, sizeof(uint32_t), size, outfile);
     }
     fclose(file);
     fclose(outfile);
     destroy_instructions(is);
+    return 0;
 }

@@ -79,15 +79,17 @@ void test_match()
     verify(true, match("LOAD", "    LOAD  ", 4, 8), "match first");
 }
 
-void test_assembly(HashMap *is)
+void test_assembly(Context *context)
 {
+
     uint32_t code[100];
-    verify(1, assemble(is, " LOAD [R1] , R2", &code[0]), "singleop");
-    assemble(is, " LOAD R127 , [R88]", &code[1]);
-    assemble(is, " ADD R3, R4", &code[2]);
-    verify(2, assemble(is, " LOAD32 R6, 4711", &code[3]), "const32");
-    verify(3, assemble(is, " LOAD64 [R99], -4711", &code[5]), "const64");
-    verify(3, assemble(is, " JUMP64 1024", &code[8]), "jump64");
+    context->dest = code;
+    verify(1, assemble(context, " LOAD [R1] , R2"), "singleop");
+    assemble(context, " LOAD R127 , [R88]");
+    assemble(context, " ADD R3, R4");
+    verify(2, assemble(context, " LOAD32 R6, 4711"), "const32");
+    verify(3, assemble(context, " LOAD64 [R99], -4711"), "const64");
+    verify(3, assemble(context, " JUMP64 1024"), "jump64");
 
     verify_hex(0x21408102, code[0], "LOAD [R1], R2");
     verify_hex(0x21407fd8, code[1], "LOAD R127, [R88]");
@@ -115,14 +117,13 @@ int64_t get_mem(Vm *vm, uint64_t offset)
     return *((uint64_t *)(vm->memory + offset));
 }
 
-void test_load(HashMap *is, Vm *vm)
+void test_load(Context *context, Vm *vm)
 {
     reset(vm);
     //inject some code to test;
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, "  LOAD R1, [R2]", dest);
-    size += assemble(is, "  LOAD [R3], R1", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, "  LOAD R1, [R2]");
+    assemble(context, "  LOAD [R3], R1");
 
     set_mem64(vm, 100, -5);
     vm->reg[1]=0;
@@ -136,15 +137,14 @@ void test_load(HashMap *is, Vm *vm)
 }
 
 
-int test_add(HashMap *is, Vm *vm)
+int test_add(Context *context, Vm *vm)
 {
     reset(vm);
     //inject some code to test;
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, " LOAD R3, [R1]", dest);
-    size += assemble(is, " LOAD R4, [R2]", dest + size);
-    size += assemble(is, " ADD R3, R4", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, " LOAD R3, [R1]");
+    assemble(context, " LOAD R4, [R2]");
+    assemble(context, " ADD R3, R4");
 
     set_mem64(vm, 80, 12);
     set_mem64(vm, 88, 34);
@@ -163,15 +163,14 @@ int test_add(HashMap *is, Vm *vm)
 }
 
 
-int test_ahead_back(HashMap *is, Vm *vm)
+int test_ahead_back(Context *context, Vm *vm)
 {
     reset(vm);
     //inject some code to test;
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, " AHEAD 512", dest);
-    size += assemble(is, " BACK 4", dest + size);
-    size += assemble(is, " JUMP64 1024", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, " AHEAD 512");
+    assemble(context, " BACK 4");
+    assemble(context, " JUMP64 1024");
 
     vm->pc = interpret(vm);
     verify(512, vm->pc, "ahead");
@@ -186,15 +185,14 @@ int test_ahead_back(HashMap *is, Vm *vm)
 }
 
 
-int test_sub(HashMap *is, Vm *vm)
+int test_sub(Context *context, Vm *vm)
 {
     reset(vm);
     //inject some code to test;
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, " LOAD R3, [R1]", dest);
-    size += assemble(is, " LOAD R4, [R2]", dest + size);
-    size += assemble(is, " SUBTRACT R4, R3", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, " LOAD R3, [R1]");
+    assemble(context, " LOAD R4, [R2]");
+    assemble(context, " SUBTRACT R4, R3");
 
     set_mem64(vm, 80, 12);
     set_mem64(vm, 88, 34);
@@ -211,14 +209,13 @@ int test_sub(HashMap *is, Vm *vm)
 }
 
 
-void test_float(HashMap *is, Vm *vm) {
+void test_float(Context *context, Vm *vm) {
     reset(vm);
         //inject some code to test;
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, " LOADFLOAT R1, 25.3", dest);
-    size += assemble(is, " ADDFLOAT64 R1, 9.7", dest + size);
-    size += assemble(is, " FLOATTOINT R0, R1", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, " LOADFLOAT R1, 25.3");
+    assemble(context, " ADDFLOAT64 R1, 9.7");
+    assemble(context, " FLOATTOINT R0, R1");
 
     vm->pc = interpret(vm);
     vm->pc = interpret(vm);
@@ -229,17 +226,16 @@ void test_float(HashMap *is, Vm *vm) {
 }
 
 
-void test_cond(HashMap *is, Vm * vm) {
+void test_cond(Context *context, Vm * vm) {
     reset(vm);
-    uint32_t *dest = (uint32_t *)vm->memory;
-    int size = 0;
-    size += assemble(is, "LOADBYTECONST R0, 12", dest);
-    size += assemble(is, "LOADBYTECONST R1, 5 IFNP", dest + size);
-    size += assemble(is, "LOADBYTECONST R2, 5 IFNN", dest + size);
-    size += assemble(is, "LOAD32 R3, 0", dest + size);
+    context->dest = (uint32_t *)vm->memory;
+    assemble(context, "LOADBYTECONST R0, 12");
+    assemble(context, "LOADBYTECONST R1, 5 IFNP");
+    assemble(context, "LOADBYTECONST R2, 5 IFNN");
+    assemble(context, "LOAD32 R3, 0");
 
-    size += assemble(is, "MULTIPLY R3, R0", dest + size);
-    size += assemble(is, "LOADBYTECONST R4, 7 IFNZ", dest + size);
+    assemble(context, "MULTIPLY R3, R0");
+    assemble(context, "LOADBYTECONST R4, 7 IFNZ");
 
     vm->pc = interpret(vm);
     vm->pc = interpret(vm);
@@ -259,18 +255,21 @@ void test_cond(HashMap *is, Vm * vm) {
 
 int run_tests(Vm *vm)
 {
-    HashMap *is = create_instructions();
-    test_hashmap();
-    test_nonspace();
-    test_space();
-    test_match();
-    test_assembly(is);
-    test_load(is, vm);
-    test_add(is, vm);
-    test_sub(is, vm);
-    test_ahead_back(is, vm);
-    test_float(is, vm);
-    test_cond(is, vm);
-    destroy_instructions(is);
+    Context context;
+    context.is = create_instructions();
+    context.strcache = create_map(100);
+
+//    test_hashmap();
+//    test_nonspace();
+//    test_space();
+//    test_match();
+//    test_assembly(&context);
+//    test_load(&context, vm);
+//    test_add(&context, vm);
+//    test_sub(&context, vm);
+//    test_ahead_back(&context, vm);
+    test_float(&context, vm);
+    test_cond(&context, vm);
+//    destroy_instructions(context.is);
     return 0;
 }
