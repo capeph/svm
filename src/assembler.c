@@ -4,7 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdio.h>
-#include <sys/_types/_u_int32_t.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include "hashmap.h"
 #include "opcodes.h"
@@ -92,7 +92,7 @@ int read_register(char *str, int start) {
 }
 
 
-uint16_t read_offset(char *str, int start, Context *context) {
+uint16_t read_offset(char *str, int start, bool forward, Context *context) {
     if (start == -1) {
         printf("assembly failed for %s: expected offset at %d\n", str, start);
         exit(-1);
@@ -103,8 +103,30 @@ uint16_t read_offset(char *str, int start, Context *context) {
         return (uint16_t)num;
     }
     else {
-        printf("not supported\n");
-        exit (-1);
+        int end = space(str+offset_start, 0);
+        if (end == -1) {
+            end = find(str+offset_start, ',', 0);
+        }
+        if (end == -1) {
+            end = strlen(str+offset_start) - 1;
+        }
+        char *label = get_str(context->strcache, str+offset_start, 0, end);
+        ReferenceUsages *ref = add_reference(context->refs, label, context->written, 2);
+        int value;
+        if (ref->location != UINT64_MAX) {
+            if (forward) {
+                printf("Can not do a backwards reference");
+                exit(-1);
+            }
+            value = context->written - ref->location;
+        }
+        else {
+            if (!forward) {
+                printf("Can not do a forwarad reference");
+            }
+            value = 0;
+        }
+        return value;
     }
 
 }
@@ -185,8 +207,15 @@ uint32_t op_no_reg(char *line, int op_end, int opcode, Context *context) {
 }
 
 
-uint32_t op_with_offset(char *line, int op_end, int opcode, Context *context) {
-    uint16_t offset = read_offset(line, op_end, context);
+uint32_t op_with_forward_offset(char *line, int op_end, int opcode, Context *context) {
+    uint16_t offset = read_offset(line, op_end, true, context);
+    int cond = read_cond(line);
+    write_32(context, opcode << 22 | cond << 16 | offset, 0);
+    return 1;
+}
+
+uint32_t op_with_back_offset(char *line, int op_end, int opcode, Context *context) {
+    uint16_t offset = read_offset(line, op_end, false, context);
     int cond = read_cond(line);
     write_32(context, opcode << 22 | cond << 16 | offset, 0);
     return 1;
@@ -227,9 +256,27 @@ uint32_t read_const32(char *line, int offset, Context *context) {
         int32_t val = (int32_t)strtol(const_start, &endptr, 10);
         memcpy(&value, &val, sizeof(val));
     }
-    else {
+    else if (isdigit(const_start[0])) {
         value = strtoul(const_start, &endptr, 10);
 //        printf("reading from %s gives %d\n", const_start, value);
+    }
+    else {
+        int end = space(const_start, 0);
+        if (end == -1) {
+            end = find(const_start, ',', 0);
+        }
+        if (end == -1) {
+            end = strlen(const_start) - 1;
+        }
+        char *label = get_str(context->strcache, const_start, 0, end);
+        ReferenceUsages *ref = add_reference(context->refs, label, context->written, 2);
+
+        if (ref->location != UINT64_MAX) {
+            value = ref->location;
+        }
+        else {
+            value = UINT32_MAX;
+        }
     }
     return value;
 }
@@ -254,13 +301,14 @@ uint64_t read_const64(char *line, int offset, Context *context) {
             end = strlen(const_start) - 1;
         }
         char *label = get_str(context->strcache, const_start, 0, end);
-//        ReferenceUsages *ref = add_reference(context->refs, label, context->dest, 2);
+        ReferenceUsages *ref = add_reference(context->refs, label, context->written, 2);
 
-
-        value = 0;
-
-
-
+        if (ref->location != UINT64_MAX) {
+            value = ref->location;
+        }
+        else {
+            value = UINT64_MAX;
+        }
     }
 
     return value;
@@ -362,8 +410,8 @@ void destroy_instructions(HashMap *map) {
 HashMap *create_instructions() {
     HashMap *map = create_map(256);
     add_instr(map, "HALT", HALT, &op_no_reg);
-    add_instr(map, "AHEAD", AHEAD, &op_with_offset);
-    add_instr(map, "BACK", BACK, &op_with_offset);
+    add_instr(map, "AHEAD", AHEAD, &op_with_forward_offset);
+    add_instr(map, "BACK", BACK, &op_with_back_offset);
     add_instr(map, "JUMP", JUMP, &op_one_reg);
     add_instr(map, "JUMP32", JUMP32, &op_const);
     add_instr(map, "JUMP64", JUMP64, &op_const);
@@ -451,17 +499,93 @@ HashMap *create_instructions() {
 }
 
 
+void patch_usages(ReferenceUsages *usages, Context *context)
+{
+    int written = context->written;
+    for(int i = 0; i < usages->count; i++) {
+        Reference ref = usages->references[i];
+        if (context->file == NULL) {
+            context->written = ref.location;
+            if (ref.size == 1) {
+                // only need to patch forward references!
+                uint32_t offset = (usages->location - ref.location) & 0xffff;
+                uint32_t *instr = (uint32_t *)(context->dest + ref.location);
+                uint32_t current = *instr;
+                *instr = current | offset;
+            }
+            else if (ref.size == 2) {
+                write_32(context, (uint32_t)usages->location, 1);
+            }
+            else if (ref.size == 3) {
+                write_64(context, usages->location, 1);
+            }
+            else {
+                printf("Invalid size");
+                exit(-1);
+            }
+        }
+        else {
+            long file_pos = ftell(context->file);
+            if (ref.size == 1) {
+                fseek(context->file, ref.location, SEEK_SET);
+                uint32_t instr;
+                if (fread(&instr, sizeof(instr), 1, context->file) != 1) {
+                    printf("read file went wrong\n");
+                    fclose(context->file);
+                    exit(-1);  // close infile, release memory
+                }
+                instr |= (usages->location - ref.location) & 0xffff;
+                fseek(context->file, ref.location, SEEK_SET);
+                if (fwrite(&instr, sizeof(instr), 1, context->file) != 1) {
+                    printf("write file went wrong\n");
+                    fclose(context->file);
+                    exit(-1);  // close infile, release memory
+                }
+            }
+            else if (ref.size == 2) {
+                fseek(context->file, ref.location + sizeof(uint32_t), SEEK_SET);
+                uint32_t value = (uint32_t)usages->location;
+                if (fwrite(&value, sizeof(value), 1, context->file) != 1) {
+                    printf("write file went wrong\n");
+                    fclose(context->file);
+                    exit(-1);  // close infile, release memory
+                }
+            }
+            else if (ref.size == 3) {
+                fseek(context->file, ref.location + sizeof(uint32_t), SEEK_SET);
+                uint64_t value = usages->location;
+                if (fwrite(&value, sizeof(value), 1, context->file) != 1) {
+                    printf("write file went wrong\n");
+                    fclose(context->file);
+                    exit(-1);  // close infile, release memory
+                }
+            }
+            fseek(context->file, file_pos, SEEK_SET);
+        }
+    }
+    context->written = written;
+
+}
+
 
 uint32_t assemble(Context *context, char *line) {
     char opcode[25];
     int op_start = nonspace(line, 0);
     int op_end = space(line, op_start);
     memcpy(opcode, line + op_start, op_end);
-    opcode[op_end - op_start] = '\0';
+    int oplen = op_end - op_start;
+    opcode[oplen] = '\0';
 //    printf("got opcode %s\n", opcode);
     Builder *builder = get_map(context->is, opcode);
     if (builder == NULL) {
-        printf("Unknown opcode %s\n", opcode);
+        if (oplen > 1 && opcode[oplen-1] == ':') {
+            opcode[oplen-1] = '\0';   // get rid of :
+            ReferenceUsages *usages = add_label(context->refs, opcode, context->written);
+            patch_usages(usages, context);
+        }
+        else {
+            printf("Unknown opcode %s\n", opcode);
+        }
     }
     int size = builder->emitter(line, op_end, builder->opcode, context);
     printf("parsed: %s\n", line);
@@ -492,7 +616,12 @@ int assemble_file(char *asmfile, char *outfilename)
         printf("provide a valid file\n");
         exit(-1);
     }
-    FILE *outfile = fopen(outfilename, "wb");
+    struct stat buf;
+    if (stat (outfilename, &buf) == 0) {
+        printf("outfile %s already exists", outfilename);
+        exit(-1);
+    }
+    FILE *outfile = fopen(outfilename, "r+b");
     if (outfile == NULL) {
         printf("failed to open outfile\n");
         fclose(file);
@@ -503,6 +632,7 @@ int assemble_file(char *asmfile, char *outfilename)
     int size = 0;
     HashMap *is = create_instructions();
     Context context;
+    context.file = outfile;
     context.is = is;
     context.strcache = create_map(1000);   // calculate from file size
     while (fgets(buffer, sizeof(buffer), file) != NULL) {

@@ -2,6 +2,7 @@
 #define ASSEMBLER_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include "hashmap.h"
 
 typedef struct {
@@ -10,6 +11,7 @@ typedef struct {
     HashMap *strcache;  // cache for strings see util.h
     HashMap *is;
     uint64_t written;  // number of bytes produced
+    FILE *file;
 } Context;
 
 int nonspace(char *str, int start);
