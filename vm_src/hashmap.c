@@ -8,7 +8,7 @@ uint32_t hash(char *str)
 {
   uint32_t hash = 2166136261u;
 
-  for (int i = 0; i < strlen(str); i++) {
+  for (int i = 0; i < (int)strlen(str); i++) {
     hash ^= (uint8_t)str[i];
     hash *= 16777619;
   }

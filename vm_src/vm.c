@@ -33,7 +33,7 @@ void destroy_vm(Vm *vm)
 int64_t get_reg(Vm *vm, uint8_t reg) {
     int64_t regval = vm->reg[reg & 127];
     if(reg & 128) {
-        if (regval > vm->mem_size) {
+        if ((uint64_t)regval > vm->mem_size) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
@@ -51,7 +51,7 @@ double get_reg_double(Vm *vm, uint8_t reg) {
     int64_t regval = vm->reg[reg & 127];
     double value = 0;
     if(reg & 128) {
-        if (regval > vm->mem_size) {
+        if ((uint64_t)regval > vm->mem_size) {
             printf("Memory access out of bounds");
             exit(OUT_OF_BOUNDS);
         }
@@ -69,7 +69,7 @@ double get_reg_double(Vm *vm, uint8_t reg) {
 uint8_t get_byte(Vm * vm, uint8_t reg){
     int64_t regval = vm->reg[reg & 127];
     if(reg & 128) {
-        if (regval > vm->mem_size) {
+        if ((uint64_t)regval > vm->mem_size) {
             printf("Memory access out of bounds %lld is more than mem_size %lld\n", regval, vm->mem_size);
             exit(OUT_OF_BOUNDS);
         }
@@ -85,7 +85,7 @@ uint8_t get_byte(Vm * vm, uint8_t reg){
 void set_reg(Vm *vm, uint8_t reg, int64_t value) {
     if(reg & 128) {
 //        printf("accessing reg %x\n", reg & 127);
-        int64_t regval = vm->reg[reg & 127];
+        uint64_t regval = vm->reg[reg & 127];
 //        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
         if (regval > vm->mem_size || regval < 0) {
@@ -104,7 +104,7 @@ void set_reg(Vm *vm, uint8_t reg, int64_t value) {
 void set_reg_double(Vm *vm, uint8_t reg, double value) {
     if(reg & 128) {
 //        printf("accessing reg %x\n", reg & 127);
-        int64_t regval = vm->reg[reg & 127];
+        uint64_t regval = vm->reg[reg & 127];
 //        printf("accessing reg %x which has val %lld\n", reg & 127, regval);
 
         if (regval > vm->mem_size | regval < 0) {

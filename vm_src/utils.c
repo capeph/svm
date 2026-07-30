@@ -1,10 +1,11 @@
 #include "hashmap.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 
 char *get_str(HashMap *cache, char *str, int start, int end) {
-    char local[120];
+    char local[256];
     memcpy(local, str + start, end-start);
     local[end=start] = '\0';
     char *cached = get_map(cache, local);

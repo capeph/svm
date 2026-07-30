@@ -1,32 +1,74 @@
-# Define the compiler to use
-CC = gcc
+# ==========================================
+# Compiler and Flags Configuration
+# ==========================================
+CC       := gcc
+CFLAGS   := -Wall -Wextra -O2 -Iinclude
+LDFLAGS  :=
 
-# Define any compile-time flags (e.g., -Wall turns on warnings, -g adds debugging info)
-CFLAGS = -Wall -g
-SOURCEDIR = src
-BUILDDIR = build
+# ==========================================
+# Target 1 Definition
+# ==========================================
+TARGET1       := lex
+SRC_DIR1      := lex_src
+BUILD_DIR1    := lex_build
+SRCS1         := $(wildcard $(SRC_DIR1)/*.c)
+OBJS1         := $(patsubst $(SRC_DIR1)/%.c, $(BUILD_DIR1)/%.o, $(SRCS1))
 
+# ==========================================
+# Target 2 Definition
+# ==========================================
+TARGET2       := vm
+SRC_DIR2      := vm_src
+BUILD_DIR2    := vm_build
+SRCS2         := $(wildcard $(SRC_DIR2)/*.c)
+OBJS2         := $(patsubst $(SRC_DIR2)/%.c, $(BUILD_DIR2)/%.o, $(SRCS2))
 
-# Define the target executable name
-TARGET = $(BUILDDIR)/svm
+# ==========================================
+# Phony Targets (Rules that don't match files)
+# ==========================================
+.PHONY: all clean lex vm
 
-# The 'all' target is the default when you run 'make'
-all: dir $(TARGET)
+# Default rule builds both applications
+all: lex vm
 
-dir:
-	mkdir -p $(BUILDDIR)
+# Short-hand targets for building individual binaries
+target1: $(TARGET1)
+target2: $(TARGET2)
 
-SRCS := $(wildcard $(SOURCEDIR)/*.c)
-OBJS := $(patsubst $(SOURCEDIR)/%.c, $(BUILDDIR)/%.o, $(SRCS))
+# ==========================================
+# Linking Rules
+# ==========================================
 
-# Rule to link object files into the final executable
-$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $^
+# Final executable for Target 1
+$(TARGET1): $(OBJS1)
+	@echo "Linking executable: $@"
+	$(CC) $(OBJS1) -o $@ $(LDFLAGS)
 
-# Rule to compile main.c into main.o
-$(BUILDDIR)/%.o: $(SOURCEDIR)/%.c
+# Final executable for Target 2
+$(TARGET2): $(OBJS2)
+	@echo "Linking executable: $@"
+	$(CC) $(OBJS2) -o $@ $(LDFLAGS)
+
+# ==========================================
+# Compilation Rules (Separate Directories)
+# ==========================================
+
+# Pattern rule for Target 1 object files
+$(BUILD_DIR1)/%.o: $(SRC_DIR1)/%.c
+	@mkdir -p $(BUILD_DIR1)
+	@echo "Compiling Lexer: $<"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Rule to clean up build files
+# Pattern rule for Target 2 object files
+$(BUILD_DIR2)/%.o: $(SRC_DIR2)/%.c
+	@mkdir -p $(BUILD_DIR2)
+	@echo "Compiling VM: $<"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# ==========================================
+# Clean Rule
+# ==========================================
 clean:
-	rm -f $(BUILDDIR)/*.o $(TARGET)
+	@echo "Cleaning build artifacts..."
+	rm -rf $(BUILD_DIR1) $(BUILD_DIR2)
+	rm -f $(TARGET1) $(TARGET2)

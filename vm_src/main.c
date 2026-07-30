@@ -29,13 +29,13 @@ int load(char *program, Vm * vm) {
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
     rewind(file);
-    int w_count = file_size / W_SIZE;
+    uint64_t w_count = file_size / W_SIZE;
     if (w_count > vm->mem_size) {
-        printf("Program is too large %d vs %llu", w_count, vm->mem_size);
+        printf("Program is too large %llu vs %llu", w_count, vm->mem_size);
         return -1;
     }
 
-    int read = fread(vm->memory, W_SIZE, w_count, file);
+    uint64_t read = fread(vm->memory, W_SIZE, w_count, file);
 
     if (read != w_count) {
         perror("Failed to read file");
