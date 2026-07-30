@@ -36,7 +36,7 @@ bool trie_has_key(TrieNode *root, char *str);
 // return 0 if nothing is found, otherwise lenght of match, match return in *data
 void *trie_longest_match(TrieNode *current, char *src, int *pos);
 void *trie_match(TrieNode *current, char *key);
-void print_trie(TrieNode *root);
+void print_trie(TrieNode *root, char *(*printer)(void *));
 bool trie_start_char(TrieNode *node, char ch);
 
 

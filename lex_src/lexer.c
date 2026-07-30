@@ -227,7 +227,6 @@ Token *read_token(LexerContext *ctx, char *line, int *pos)
         return NULL;
     }
     else {
-        printf("got token(%s)\n", token->name);
         *pos += read;
         return token;
     }
@@ -240,9 +239,13 @@ void tokenize_line(LexerContext *ctx, char *line) {
     printf("Indent(%d)\n", indent);
     while(pos < end) {
         Token *tok = read_token(ctx, line, &pos);
+
         if (tok == NULL) {
             printf("bad token at %d on %s\n", pos, line);
             exit(-1);
+        }
+        else {
+            printf("got token(%d: %s, %s)\n", tok->token_type, tok->name, tok->value);
         }
     }
     printf("end\n");
@@ -255,6 +258,16 @@ TokenData *describe_token(char *name, int type)
     data->name = name;
     data->token_type = type;
     return data;
+}
+
+char *token_data_printer(void *data) {
+    if (data == NULL) {
+        return "-";
+    }
+    else {
+        TokenData *td = data;
+        return td->name;
+    }
 }
 
 void tokenize_file(char *source) {
@@ -288,8 +301,7 @@ void tokenize_file(char *source) {
     trie_add(&ops, ":", describe_token("COLON", 116));
     trie_add(&ops, ";", describe_token("SEMICOLON", 117));
     ctx.operators = &ops;
-
-    print_trie(&ops);
+    print_trie(&ops, token_data_printer);
 
     TrieNode keywords;
     keywords.value = 0;

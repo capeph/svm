@@ -226,52 +226,14 @@ bool trie_has_string(TrieNode *root, char*str) {
 
 
 
-void print_trie(TrieNode *root) {
-    printf("node(%c, %s) ", root->value, (char *)root->data);
+void print_trie(TrieNode *root, char *(*printer)(void *)) {
+    char *tokenName = printer(root->data);
+    printf("node(%c, %s) ", root->value, tokenName);
     for (int i = 0; i < root->node_count; i++) {
         printf(" - ");
-        print_trie(&root->nodes[i]);
+        print_trie(&root->nodes[i], printer);
     }
     if (root->node_count == 0) {
         printf(" .\n");
     }
 }
-
-    /*
-
-    TrieNode root;
-    root.value = 0;
-    root.node_count = 0;
-    root.word = NULL;
-
-    trie_add_string(&root, "apa");
-    trie_add_string(&root, "banan");
-    trie_add_string(&root, "blomma");
-    trie_add_string(&root, "cykel");
-    trie_add_string(&root, "doneky");
-    trie_add_string(&root, "doneky");
-    trie_add_string(&root, "electricity");
-    trie_add_string(&root, "election");
-    trie_add_string(&root, "fashion");
-    trie_add_string(&root, "apparat");
-    trie_add_string(&root, "fashionable");
-    trie_add_string(&root, "app");
-    trie_add_string(&root, "apparat");
-
-
-    if(trie_has_string(&root, "app")) {
-        printf("yay\n");
-    }
-    if(trie_has_string(&root, "apt")) {
-        printf("nay\n");
-    }
-    if(trie_has_string(&root, "apparat")) {
-        printf("wows\n");
-    }
-    if(trie_has_string(&root, "appar")) {
-        printf("cows\n");
-    }
-    char *longest = trie_longest_match(&root, "apparatchnik");
-    printf("found longest: %s\n", longest);
-
-    */
