@@ -2,7 +2,7 @@
 #define REFERENCES_H
 
 #include <stdint.h>
-#include "hashmap.h"
+#include "utils.h"
 
 #define _32BIT 1
 #define _64BIT 2

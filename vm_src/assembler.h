@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "hashmap.h"
+#include "utils.h"
 
 typedef struct {
     void *dest;

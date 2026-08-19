@@ -6,10 +6,15 @@
 #include "utils.h"
 #include "lexer.h"
 
+#define LINE_BUFFER_SIZE 512
 #define TAB_SPACES 4
-TokenData number_data = {"NUMBER", 1};
-TokenData string_data = {"STRING", 2};
-TokenData identifier_data = {"IDENTIFIER", 3};
+TokenData eof_data = {"EOF", EOF_TYPE};
+TokenData number_data = {"NUMBER", NUMBER};
+TokenData string_data = {"STRING", STRING};
+TokenData identifier_data = {"IDENTIFIER", IDENTIFIER};
+TokenData indent_data = {"INDENT", INDENT};
+TokenData dedent_data = {"DEDENT", DEDENT};
+TokenData separator_data = {"SEPARATOR", SEPARATOR};
 
 
 bool is_decimal_separator(char ch) {
@@ -82,6 +87,9 @@ Token *get_number(LexerContext *ctx, char *line, int *offset)
             pos++;
         }
     }
+    if (pos == int_start) {
+        return NULL;  // no number found
+    }
     if (is_exponent_separator(line[pos], base)) {
         pos++;
         if (is_sign(line[pos])) {
@@ -91,13 +99,10 @@ Token *get_number(LexerContext *ctx, char *line, int *offset)
             pos++;
         }
     }
-    if (pos == int_start) {
-        return NULL; // no number found
-    }
 
     char *num = get_str(ctx->str_cache, line, *offset, pos);
     *offset = pos;
-    return get_token(&number_data, num, 1);
+    return make_token(&number_data, num, 1);
 }
 
 Token *get_operator(LexerContext *ctx, char *line, int *offset) {
@@ -107,7 +112,7 @@ Token *get_operator(LexerContext *ctx, char *line, int *offset) {
     {
 //        printf("got longest match %s(%d)\n", match, matched);
         char *token_string = get_str(ctx->str_cache, line, *offset, *offset + matched);
-        Token *token = get_token(match, token_string, 1);
+        Token *token = make_token(match, token_string, 1);
         *offset += matched;
         return token;
     }
@@ -136,7 +141,7 @@ Token *get_string(LexerContext *ctx, char *line, int *offset) {
         char *str = get_str(ctx->str_cache, line, str_start, pos);
 //        printf("got string(%lu) %s\n", strlen(str), str);
         *offset = pos+1;
-        return get_token(&string_data, str, 1);
+        return make_token(&string_data, str, 1);
     }
     printf("malformed string!");
     return NULL;
@@ -166,9 +171,9 @@ Token *get_identifier(LexerContext *ctx, char *line, int *offset) {
     TokenData *keyword = trie_match(ctx->keywords, id);
     *offset = pos;
     if (keyword != NULL) {
-        return get_token(keyword, id, 1);
+        return make_token(keyword, id, 1);
     }
-    return get_token(&identifier_data, id, 1);
+    return make_token(&identifier_data, id, 1);
 
 }
 
@@ -208,7 +213,6 @@ Token *read_token(LexerContext *ctx, char *line, int *pos)
     char *str = line + *pos;
     int read = 0;
     Token *token = NULL;
-//    token = get_white_space(ctx, str, &read);
     if (read == 0) {
         token = get_operator(ctx, str, &read);
     }
@@ -218,7 +222,6 @@ Token *read_token(LexerContext *ctx, char *line, int *pos)
     if (read == 0) {
         token = get_string(ctx, str, &read);
     }
-
     if (read == 0) {
         token = get_identifier(ctx, str, &read);
     }
@@ -270,65 +273,8 @@ char *token_data_printer(void *data) {
     }
 }
 
-void tokenize_file(char *source) {
-    FILE *file = fopen(source, "r");
-    if (file == NULL) {
-        printf("provide a valid file\n");
-        exit(-1);
-    }
-    LexerContext ctx;
-    ctx.token_info = create_map(500);
 
-    TrieNode ops;
-    ops.value = 0;
-    ops.node_count = 0;
-    ops.data = NULL;
-    trie_add(&ops, "+", describe_token("PLUS", 101));
-    trie_add(&ops, "-", describe_token("MINUS", 102));
-    trie_add(&ops, "*", describe_token("MULT", 103));
-    trie_add(&ops, "/", describe_token("DIV", 104));
-    trie_add(&ops, "=", describe_token("IS", 105));
-    trie_add(&ops, "!=", describe_token("NEQ", 106));
-    trie_add(&ops, "!", describe_token("NOT", 107));
-    trie_add(&ops, "(", describe_token("LPAR", 108));
-    trie_add(&ops, ")", describe_token("RPAR", 109));
-    trie_add(&ops, "<", describe_token("LT", 110));
-    trie_add(&ops, ">", describe_token("GT", 111));
-    trie_add(&ops, "<=", describe_token("LE", 112));
-    trie_add(&ops, ">=", describe_token("GE", 113));
-    trie_add(&ops, "==", describe_token("EQ", 114));
-    trie_add(&ops, ",", describe_token("COMMA", 115));
-    trie_add(&ops, ":", describe_token("COLON", 116));
-    trie_add(&ops, ";", describe_token("SEMICOLON", 117));
-    ctx.operators = &ops;
-    print_trie(&ops, token_data_printer);
-
-    TrieNode keywords;
-    keywords.value = 0;
-    keywords.node_count = 0;
-    keywords.data = NULL;
-    trie_add(&keywords, "if", describe_token("IF", 200));
-    trie_add(&keywords, "do", describe_token("DO", 201));
-    ctx.keywords = &keywords;
-
-    ctx.white_space = " \t\n\r";
-    ctx.str_cache = create_map(1024);
-    char line[256];
-    memset(line, 0, sizeof(line));
-    while (fgets(line, sizeof(line), file) != NULL) {
-        int len = strlen(line);
-
-        if (line[len - 1] == '\n') {
-            line[len -1] = '\0';
-        }
-        printf("tokenizing: '%s'\n",line);
-        tokenize_line(&ctx, line);
-    }
-
-}
-
-
-Token *get_token(TokenData *type, char *string, int count) {
+Token *make_token(TokenData *type, char *string, int count) {
     Token *token = malloc(sizeof(Token));
     token ->token_type = type->token_type;
     token ->value = string;
@@ -339,4 +285,104 @@ Token *get_token(TokenData *type, char *string, int count) {
 
 void return_token(Token *token) {
     free(token);
+}
+
+
+void setup_operators(LexerContext *ctx)
+{
+    TrieNode *ops = malloc(sizeof(TrieNode));
+    ops->value = 0;
+    ops->node_count = 0;
+    ops->data = NULL;
+    trie_add(ops, "+", describe_token("PLUS", PLUS));
+    trie_add(ops, "-", describe_token("MINUS", MINUS));
+    trie_add(ops, "*", describe_token("MULT", MULT));
+    trie_add(ops, "/", describe_token("DIV", DIV));
+    trie_add(ops, "=", describe_token("IS", IS));
+    trie_add(ops, "!=", describe_token("NEQ", NEQ));
+    trie_add(ops, "!", describe_token("NOT", NOT));
+    trie_add(ops, "(", describe_token("LPAR", LPAR));
+    trie_add(ops, ")", describe_token("RPAR", RPAR));
+    trie_add(ops, "<", describe_token("LT", LT));
+    trie_add(ops, ">", describe_token("GT", GT));
+    trie_add(ops, "<=", describe_token("LE", LE));
+    trie_add(ops, ">=", describe_token("GE", GE));
+    trie_add(ops, "==", describe_token("EQ", EQ));
+    trie_add(ops, ",", describe_token("COMMA", COMMA));
+    trie_add(ops, ":", describe_token("COLON", COLON));
+    trie_add(ops, ";", describe_token("SEMICOLON", SEMICOLON));
+    ctx->operators = ops;
+}
+
+void setup_keywords(LexerContext *ctx) {
+    TrieNode *keywords = malloc(sizeof(TrieNode));
+    keywords->value = 0;
+    keywords->node_count = 0;
+    keywords->data = NULL;
+    trie_add(keywords, "if", describe_token("IF", IF));
+    trie_add(keywords, "do", describe_token("DO", DO));
+    ctx->keywords = keywords;
+}
+
+
+LexerContext *get_lexer(char *source) {
+    LexerContext *ctx = malloc(sizeof(LexerContext));
+    ctx->file = fopen(source, "r");
+    if (ctx->file == NULL) {
+        printf("provide a valid file\n");
+        return NULL;
+    }
+    setup_operators(ctx);
+    setup_keywords(ctx);
+    ctx->str_cache = create_map(1024);
+    ctx->line = malloc(LINE_BUFFER_SIZE);
+    ctx->offset = 0;
+    ctx->indent = 0;
+    memset(ctx->line, 0, LINE_BUFFER_SIZE);
+    ctx->white_space = " \t\n\r";
+
+    return ctx;
+}
+
+
+Token *next_token(LexerContext *ctx) {
+    int indent = ctx->indent;
+    bool newline = false;
+    bool retry;
+    do {
+        retry = false;
+        newline = false;
+        while (ctx->line[ctx->offset] == '\0') {
+            if (fgets(ctx->line, LINE_BUFFER_SIZE, ctx->file) == NULL) {
+                ctx->last_token = make_token(&eof_data, "", 1);
+                return ctx->last_token;
+            }
+            int last = strlen(ctx->line) - 1;
+            if (ctx->line[last] == '\n') {
+                ctx->line[last] = '\0';
+            }
+            ctx->offset = 0;
+            indent = get_indent(ctx->line, &ctx->offset);
+            newline = true;
+        }
+        if (indent > ctx->indent) {
+            ctx->indent = indent;
+            ctx->last_token = make_token(&indent_data, get_str(ctx->str_cache, ctx->line, 0, ctx->offset), indent);
+        }
+        else if (indent < ctx->indent) {
+            ctx->indent = indent;
+            ctx->last_token =  make_token(&dedent_data, get_str(ctx->str_cache, ctx->line, 0, ctx->offset), indent);
+        }
+        else if (newline && indent == ctx->indent) {
+            if (ctx->last_token == NULL || ctx->last_token->token_type == separator_data.token_type) {
+                retry = true;
+            }
+                ctx->last_token = make_token(&separator_data, "", 0);
+        }
+        else {
+            ctx->last_token = read_token(ctx, ctx->line, &ctx->offset);
+        }
+    } while (retry);
+
+    return ctx->last_token;
 }

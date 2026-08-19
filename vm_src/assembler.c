@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "hashmap.h"
 #include "opcodes.h"
 #include "assembler.h"
 #include "utils.h"
@@ -396,9 +395,9 @@ uint32_t op_const(char *line, int op_end, int opcode, Context *context) {
 
 void destroy_instructions(HashMap *map) {
     for(int i = 0; i < map->size; i++) {
-        Node *node = map->entries[i];
+        MapNode *node = map->entries[i];
         while (node != NULL) {
-            Node *next = node->next;
+            MapNode *next = node->next;
             Builder *builder = node->data;
             free(builder);
             free(node);

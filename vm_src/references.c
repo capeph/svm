@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "references.h"
-#include "hashmap.h"
+#include "utils.h"
 
 #define REFERENCE_COUNT 100
 

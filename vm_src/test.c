@@ -1,7 +1,7 @@
 #include "test.h"
 #include "interpreter.h"
 #include "assembler.h"
-#include "hashmap.h"
+#include "utils.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

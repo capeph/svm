@@ -237,3 +237,33 @@ void print_trie(TrieNode *root, char *(*printer)(void *)) {
         printf(" .\n");
     }
 }
+
+
+Array *create_array(int initial_size) {
+    Array *list = malloc(sizeof(Array));
+    list->data = malloc(sizeof(void *) * initial_size);
+    list->array_size = initial_size;
+    list->last = -1;
+    memset(list->data, 0, sizeof(void *) * initial_size);
+    return list;
+}
+
+void add_to_array(Array *list, void *data) {
+    if (list->last == list->array_size -1) {
+        void *new_list = malloc(sizeof(void *) * list->array_size * 2);
+        memset(list->data, 0, sizeof(void *) * list->array_size * 2);
+        memcpy(new_list, list->data, sizeof(void *) * list->array_size);
+        free(list->data);
+        list->data = new_list;
+    }
+    list->last++;
+    *(list->data + list->last) = data;
+}
+
+int get_array_size(Array *list) {
+    return list->last;
+}
+
+void *get_array(Array *array, int idx) {
+    return *(array->data + idx);
+}
