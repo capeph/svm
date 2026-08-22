@@ -8,9 +8,11 @@
 
 #define LINE_BUFFER_SIZE 512
 #define TAB_SPACES 4
+#define COMMENT '#'
 TokenData eof_data = {"EOF", EOF_TYPE};
 TokenData number_data = {"NUMBER", NUMBER};
 TokenData string_data = {"STRING", STRING};
+TokenData character_data = {"CHARACTER", CHARACTER};
 TokenData identifier_data = {"IDENTIFIER", IDENTIFIER};
 TokenData indent_data = {"INDENT", INDENT};
 TokenData dedent_data = {"DEDENT", DEDENT};
@@ -44,6 +46,9 @@ int get_indent(char *line, int *offset) {
         }
         else if (ch == '\t') {
             indent += TAB_SPACES;
+        }
+        else if (ch == COMMENT) {
+            *offset = len;
         }
         else {
             break;
@@ -147,8 +152,32 @@ Token *get_string(LexerContext *ctx, char *line, int *offset) {
     return NULL;
 }
 
-char *get_character(LexerContext *ctx, char *line, int *offset)
+Token *get_character(LexerContext *ctx, char *line, int *offset)
 {
+    int pos = *offset;
+    if (line[pos] != '\'') {
+        return NULL;  // not called at start of character
+    }
+    pos++;
+    int str_start = pos;
+    while(line[pos] != '\'' && line[pos] != '\0') {
+        if (line[pos] == '\\') {
+            pos++; // skip next char! escaped
+            if (line[pos] =='\0') {
+                printf("escaped end of line!");
+                return NULL;
+            }
+        }
+        pos++;
+//        printf("start = %d, pos = %d\n", str_start, pos);
+    }
+    if (line[pos] == '\'') {
+        char *str = get_str(ctx->str_cache, line, str_start, pos);
+//        printf("got string(%lu) %s\n", strlen(str), str);
+        *offset = pos+1;
+        return make_token(&character_data, str, 1);
+    }
+    printf("malformed string!");
     return NULL;
 }
 
@@ -195,15 +224,21 @@ void *get_white_space(LexerContext *ctx, char* line, int *pos) {
             default : return "NOISE";
         }
     }
+    if (line[*pos] == '#') {
+        *pos = strlen(line);
+        return "COMMENT";
+    }
+
     return NULL;
 }
 
-void skip_white_space(LexerContext *ctx, char* line, int *pos) {
+int skip_white_space(LexerContext *ctx, char* line, int *pos) {
     int i = 0;
     while(get_white_space(ctx, line, pos) != NULL){
         i++;
     }
 //    printf("(%d spaces)\n", i);
+    return i;
 }
 
 
@@ -218,6 +253,9 @@ Token *read_token(LexerContext *ctx, char *line, int *pos)
     }
     if (read == 0) {
         token = get_number(ctx, str, &read);
+    }
+    if (read == 0) {
+        token = get_character(ctx, str, &read);
     }
     if (read == 0) {
         token = get_string(ctx, str, &read);
@@ -315,6 +353,7 @@ void setup_operators(LexerContext *ctx)
     trie_add(ops, ",", describe_token("COMMA", COMMA));
     trie_add(ops, ":", describe_token("COLON", COLON));
     trie_add(ops, ";", describe_token("SEMICOLON", SEMICOLON));
+
     ctx->operators = ops;
 }
 
@@ -359,12 +398,14 @@ Token *next_token(LexerContext *ctx) {
         while (ctx->line[ctx->offset] == '\0') {
             if (fgets(ctx->line, LINE_BUFFER_SIZE, ctx->file) == NULL) {
                 ctx->last_token = make_token(&eof_data, "", 1);
+//                printf("eof token\n");
                 return ctx->last_token;
             }
             int last = strlen(ctx->line) - 1;
             if (ctx->line[last] == '\n') {
                 ctx->line[last] = '\0';
             }
+            printf("read line: %s\n", ctx->line);
             ctx->offset = 0;
             indent = get_indent(ctx->line, &ctx->offset);
             newline = true;

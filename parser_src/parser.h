@@ -19,35 +19,32 @@
 
 typedef struct {
     int node_type;
-} typed_ast_node;
+} ast_node;
 
 typedef struct {
-    int node_type;
+    ast_node ast;
     char *string_value;
 } ast_value_node;
 
 typedef struct {
-    int node_type;
+    ast_node ast;
     void *base;
     Array *nodes;
 } ast_multi_op;
 
 typedef struct {
-    int node_type;
+    ast_node ast;
     Token *operator;
     void *left;
     void *right;
 } ast_binary_op;
 
 typedef struct {
-    int node_type;
+    ast_node ast;
     Token *operator;
     void *value;
 } ast_unary_op;
 
-typedef struct {
-
-} AST;
 
 
 typedef void *(*node_reader)(LexerContext *);
@@ -56,6 +53,6 @@ void *factor(LexerContext *ctx);
 void *term(LexerContext *ctx);
 void *expression(LexerContext *ctx);
 
-AST *parse_module(char *name);
+void *parse_module(char *name);
 
 #endif

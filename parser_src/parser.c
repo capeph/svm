@@ -31,7 +31,7 @@ ast_binary_op *make_binop(LexerContext *ctx, void *left_node, node_reader right_
         return NULL;
     }
     ast_binary_op *node = malloc(sizeof(ast_binary_op));
-    node->node_type = node_type;
+    ((ast_node *)node)->node_type = node_type;
     node->left = left_node;
     node->operator = op;
     node->right = right_node;
@@ -40,7 +40,7 @@ ast_binary_op *make_binop(LexerContext *ctx, void *left_node, node_reader right_
 
 ast_value_node *build_value(char *value, int node_type) {
     ast_value_node *node = malloc(sizeof(ast_value_node));
-    node->node_type = node_type;
+    ((ast_node *)node)->node_type = node_type;
     node->string_value = value;
     return node;
 }
@@ -66,14 +66,6 @@ bool is_prefix_op(LexerContext *ctx) {
 
 bool is_mulop(LexerContext *ctx) {
     return is_token(ctx, MULT) || is_token(ctx, DIV);
-}
-
-void *arr_index(LexerContext *ctx) {
-    return NULL;
-}
-
-void *param_list(LexerContext *ctx) {
-    return NULL;
 }
 
 ast_value_node *identifier(LexerContext *ctx) {
@@ -126,7 +118,7 @@ void *postfix_factor(LexerContext *ctx) {
         if (is_token(ctx, LPAR)) {
             next_token(ctx);
             ast_multi_op *call = malloc(sizeof(ast_multi_op));
-            call->node_type = FUNCTION_CALL;
+            ((ast_node *)call)->node_type = FUNCTION_CALL;
             call->nodes = create_array(16);
             call->base = base;
             while (!is_token(ctx, RPAR)) {
@@ -164,7 +156,7 @@ void *prefix_factor(LexerContext *ctx) {
         }
         ast_unary_op *node = malloc(sizeof(ast_unary_op));
         node->operator = operator;
-        node->node_type = UNARY_NODE;
+        ((ast_node *)node)->node_type = UNARY_NODE;
         node->value = operand;
         return node;
     }
@@ -211,6 +203,7 @@ ast_binary_op *definition(LexerContext *ctx) {
         error(ctx, "definition name");
         return NULL;
     }
+//    printf("got defintion name %s\n", ident->string_value);
     if (is_token(ctx, IS)) {
         ast_binary_op *def = make_binop(ctx, ident, expression, BINARY_NODE, "expression");
         return def;
@@ -226,7 +219,7 @@ ast_multi_op *module(LexerContext *ctx, char *name) {
     // replace with generic builder
     ast_multi_op *module = malloc(sizeof(ast_multi_op));
 
-    module->node_type = MODULE_NODE;
+    ((ast_node *)module)->node_type = MODULE_NODE;
     module->nodes = create_array(16);
     module->base = build_value(name, IDENTIFIER_NODE);
     while (!is_token(ctx, EOF_TYPE)) {
@@ -234,13 +227,16 @@ ast_multi_op *module(LexerContext *ctx, char *name) {
             error(ctx, "definition");
             return NULL;
         }
-        void *def = definition(ctx);
-        if (def == NULL) {
-            return NULL;
-        }
-        add_to_array(module->nodes, def);
         if (is_token(ctx, SEPARATOR)) {
             next_token(ctx);
+//            printf("got separator, next is %s\n", ctx->last_token->name);
+        }
+        else {
+            void *def = definition(ctx);
+            if (def == NULL) {
+                return NULL;
+            }
+            add_to_array(module->nodes, def);
         }
     }
     return module;
@@ -255,14 +251,8 @@ char *resolve_module_file(char *module_name) {
 
 
 
-AST *init_ast() {
-    AST *ast = malloc(sizeof(AST));
-    return ast;
-}
-
-
 void print_nodes(char *prefix, void *root) {
-    switch (((typed_ast_node *)root)->node_type) {
+    switch (((ast_node *)root)->node_type) {
     case NUMBER_NODE:
         printf("%s number(%s)\n", prefix, ((ast_value_node *)root)->string_value);
         break;
@@ -292,6 +282,7 @@ void print_nodes(char *prefix, void *root) {
             printf("%s + call(%s)\n", prefix, ((ast_value_node *)module->base)->string_value);
             char new_prefix[strlen(prefix) + 3];
             snprintf(new_prefix, sizeof(new_prefix), "%s | ", prefix);
+            print_nodes(new_prefix, module->base);
             for(int i = 0; i <= module->nodes->last; i++) {
                 print_nodes(new_prefix, get_array(module->nodes, i));
             }
@@ -321,7 +312,7 @@ void print_nodes(char *prefix, void *root) {
     }
 }
 
-AST *parse_module(char *name)
+void *parse_module(char *name)
 {
     char *fname = resolve_module_file(name);
     LexerContext *ctx = get_lexer(fname);
@@ -336,5 +327,5 @@ AST *parse_module(char *name)
     else if (ctx->last_token->token_type != EOF_TYPE) {
         printf("Unknown token  %s (%s)", ctx->last_token->name, ctx->last_token->value);
     }
-    return NULL;
+    return root;
 }

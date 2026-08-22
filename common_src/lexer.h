@@ -5,11 +5,12 @@
 
 #define EOF_TYPE 0
 #define IDENTIFIER 1
-#define INDENT 1
-#define DEDENT 2
-#define SEPARATOR 2
+#define INDENT 2
+#define DEDENT 3
+#define SEPARATOR 4
 #define STRING 10
 #define NUMBER 11
+#define CHARACTER 12
 #define PLUS 101
 #define MINUS 102
 #define MULT 103
