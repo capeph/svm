@@ -19,14 +19,18 @@
 #define NOT 107
 #define LPAR 108
 #define RPAR 109
-#define LT 110
-#define GT 111
-#define LE 112
-#define GE 113
-#define EQ 114
-#define COMMA 115
-#define COLON 116
-#define SEMICOLON 117
+#define LBRACKET 110
+#define RBRACKET 111
+#define LBRACE 112
+#define RBRACE 113
+#define LT 114
+#define GT 115
+#define LE 116
+#define GE 117
+#define EQ 118
+#define COMMA 119
+#define COLON 120
+#define SEMICOLON 121
 #define IF 200
 #define DO 201
 

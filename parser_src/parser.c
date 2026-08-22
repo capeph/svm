@@ -38,12 +38,17 @@ ast_binary_op *make_binop(LexerContext *ctx, void *left_node, node_reader right_
     return node;
 }
 
+ast_value_node *build_value(char *value, int node_type) {
+    ast_value_node *node = malloc(sizeof(ast_value_node));
+    node->node_type = node_type;
+    node->string_value = value;
+    return node;
+}
+
 ast_value_node *make_value(LexerContext *ctx, int token_type, int node_type, char *expected) {
 //    printf("make_value\n");
     if (is_token(ctx, token_type)) {
-        ast_value_node *node = malloc(sizeof(ast_value_node));
-        node->node_type = node_type;
-        node->string_value = ctx->last_token->value;
+        ast_value_node *node = build_value(ctx->last_token->value, node_type);
         next_token(ctx);
         return node;
     }
@@ -63,6 +68,14 @@ bool is_mulop(LexerContext *ctx) {
     return is_token(ctx, MULT) || is_token(ctx, DIV);
 }
 
+void *arr_index(LexerContext *ctx) {
+    return NULL;
+}
+
+void *param_list(LexerContext *ctx) {
+    return NULL;
+}
+
 ast_value_node *identifier(LexerContext *ctx) {
     return make_value(ctx, IDENTIFIER, IDENTIFIER_NODE, "identifier");
 }
@@ -75,24 +88,13 @@ ast_value_node *string(LexerContext *ctx) {
     return make_value(ctx, STRING, STRING_NODE, "string");
 }
 
-ast_unary_op *unary_op(LexerContext *ctx) {
-//    printf("unary_op\n");
-    Token *operator = ctx->last_token;
-    next_token(ctx);
-    void *operand = factor(ctx);
-    if (operand == NULL) {
-        error(ctx, "factor");
-        return NULL;
-    }
-    ast_unary_op *node = malloc(sizeof(ast_unary_op));
-    node->operator = operator;
-    node->node_type = UNARY_NODE;
-    node->value = operand;
-    return node;
+
+bool is_postfix_op(LexerContext *ctx) {
+    return is_token(ctx, LPAR);
+
 }
 
-void *factor(LexerContext *ctx) {
-//    printf("factor\n");
+void *base_factor(LexerContext *ctx) {
     if (is_token(ctx, IDENTIFIER)) {
         return identifier(ctx);
     }
@@ -101,9 +103,6 @@ void *factor(LexerContext *ctx) {
     }
     else if (is_token(ctx, STRING)) {
         return string(ctx);
-    }
-    else if (is_prefix_op(ctx)) {
-        return unary_op(ctx);
     }
     else if (is_token(ctx, LPAR)) {
         next_token(ctx);
@@ -115,8 +114,66 @@ void *factor(LexerContext *ctx) {
         error(ctx, "closing paren");
         return NULL;
     }
-    error(ctx, "factor");
+
+    error(ctx, "base factor");
     return NULL;
+}
+
+
+void *postfix_factor(LexerContext *ctx) {
+    void *base = base_factor(ctx);
+    while (is_postfix_op(ctx))
+        if (is_token(ctx, LPAR)) {
+            next_token(ctx);
+            ast_multi_op *call = malloc(sizeof(ast_multi_op));
+            call->node_type = FUNCTION_CALL;
+            call->nodes = create_array(16);
+            call->base = base;
+            while (!is_token(ctx, RPAR)) {
+                if (ctx->last_token == NULL || ctx->last_token==EOF_TYPE) {
+                    error(ctx, "complete parameter list");
+                    return NULL;
+                }
+                void *exp = expression(ctx);
+                if (exp == NULL) {
+                    return NULL;
+                }
+                add_to_array(call->nodes, exp);
+                if (is_token(ctx, COMMA)) {
+                    next_token(ctx);
+                }
+                while(is_token(ctx, SEPARATOR)) {
+                    next_token(ctx);
+                }
+            }
+            next_token(ctx);
+            base = call;
+        }
+    return base;
+}
+
+
+void *prefix_factor(LexerContext *ctx) {
+    if (is_prefix_op(ctx)) {
+        Token *operator = ctx->last_token;
+        next_token(ctx);
+        void *operand = prefix_factor(ctx);
+        if (operand == NULL) {
+            error(ctx, "operand to prefix operator ");
+            return NULL;
+        }
+        ast_unary_op *node = malloc(sizeof(ast_unary_op));
+        node->operator = operator;
+        node->node_type = UNARY_NODE;
+        node->value = operand;
+        return node;
+    }
+    return postfix_factor(ctx);
+}
+
+
+void *factor(LexerContext *ctx) {
+    return prefix_factor(ctx);
 }
 
 void *term(LexerContext *ctx) {
@@ -163,12 +220,15 @@ ast_binary_op *definition(LexerContext *ctx) {
 }
 
 
+
 ast_multi_op *module(LexerContext *ctx, char *name) {
+
+    // replace with generic builder
     ast_multi_op *module = malloc(sizeof(ast_multi_op));
 
     module->node_type = MODULE_NODE;
     module->nodes = create_array(16);
-    module->identifier = name;
+    module->base = build_value(name, IDENTIFIER_NODE);
     while (!is_token(ctx, EOF_TYPE)) {
         if (ctx->last_token == NULL) {
             error(ctx, "definition");
@@ -209,13 +269,27 @@ void print_nodes(char *prefix, void *root) {
     case STRING_NODE:
         printf("%s string(%s)\n", prefix, ((ast_value_node *)root)->string_value);
         break;
+    case VARIABLE_NODE:
+        printf("%s + variable(%s)\n", prefix, ((ast_value_node *)root)->string_value);
+        break;
     case IDENTIFIER_NODE:
         printf("%s + identifier(%s)\n", prefix, ((ast_value_node *)root)->string_value);
         break;
     case MODULE_NODE:
         {
             ast_multi_op *module = (ast_multi_op *)root;
-            printf("%s + module(%s)\n", prefix, module->identifier);
+            printf("%s + module(%s)\n", prefix, ((ast_value_node *)module->base)->string_value);
+            char new_prefix[strlen(prefix) + 3];
+            snprintf(new_prefix, sizeof(new_prefix), "%s | ", prefix);
+            for(int i = 0; i <= module->nodes->last; i++) {
+                print_nodes(new_prefix, get_array(module->nodes, i));
+            }
+            break;
+        }
+    case FUNCTION_CALL:
+        {
+            ast_multi_op *module = (ast_multi_op *)root;
+            printf("%s + call(%s)\n", prefix, ((ast_value_node *)module->base)->string_value);
             char new_prefix[strlen(prefix) + 3];
             snprintf(new_prefix, sizeof(new_prefix), "%s | ", prefix);
             for(int i = 0; i <= module->nodes->last; i++) {

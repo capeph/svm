@@ -303,6 +303,10 @@ void setup_operators(LexerContext *ctx)
     trie_add(ops, "!", describe_token("NOT", NOT));
     trie_add(ops, "(", describe_token("LPAR", LPAR));
     trie_add(ops, ")", describe_token("RPAR", RPAR));
+    trie_add(ops, "[", describe_token("LBRACKET", LBRACKET));
+    trie_add(ops, "]", describe_token("RBRACKET", RBRACKET));
+    trie_add(ops, "{", describe_token("LBRACE", LBRACE));
+    trie_add(ops, "}", describe_token("RBRACE", RBRACE));
     trie_add(ops, "<", describe_token("LT", LT));
     trie_add(ops, ">", describe_token("GT", GT));
     trie_add(ops, "<=", describe_token("LE", LE));

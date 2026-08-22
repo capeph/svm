@@ -13,6 +13,8 @@
 #define DEFINITION_NODE 9
 #define BINARY_NODE 10
 #define UNARY_NODE 11
+#define VARIABLE_NODE 12
+#define INDEX 13
 
 
 typedef struct {
@@ -26,7 +28,7 @@ typedef struct {
 
 typedef struct {
     int node_type;
-    char *identifier;
+    void *base;
     Array *nodes;
 } ast_multi_op;
 
