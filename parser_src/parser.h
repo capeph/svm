@@ -8,7 +8,8 @@
 #define STRING_NODE 2       // ast_value_node
 #define IDENTIFIER_NODE 3   // ast_value_node
 #define FUNCTION_CALL 4   // ast_value_node
-#define SIMPLE_EXP 5
+#define FUNCTION_DEF 5
+#define SIMPLE_EXP 6
 #define MODULE_NODE 8
 #define DEFINITION_NODE 9
 #define BINARY_NODE 10
@@ -49,10 +50,16 @@ typedef struct {
 
 typedef void *(*node_reader)(LexerContext *);
 
+void clear_ast_node(void *node);
+
 void *factor(LexerContext *ctx);
 void *term(LexerContext *ctx);
+
+void *syntactic_expression(LexerContext *ctx) ;
+void *algebraic_expression(LexerContext *ctx);
 void *expression(LexerContext *ctx);
 
 void *parse_module(char *name);
 
+void print_nodes(char *prefix, void *root);
 #endif

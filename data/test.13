@@ -1,2 +1,2 @@
-a=f(b)+c*(f(g+b, b)+2)
-b=h("hello" + 2)
+let a = f(b) + c * (f(g + b, b) + 2)
+let b = h("hello" + 2)

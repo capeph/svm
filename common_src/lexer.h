@@ -3,37 +3,54 @@
 #include "utils.h"
 #include <stdio.h>
 
-#define EOF_TYPE 0
-#define IDENTIFIER 1
-#define INDENT 2
-#define DEDENT 3
-#define SEPARATOR 4
-#define STRING 10
-#define NUMBER 11
-#define CHARACTER 12
-#define PLUS 101
-#define MINUS 102
-#define MULT 103
-#define DIV 104
-#define IS 105
-#define NEQ 106
-#define NOT 107
-#define LPAR 108
-#define RPAR 109
-#define LBRACKET 110
-#define RBRACKET 111
-#define LBRACE 112
-#define RBRACE 113
-#define LT 114
-#define GT 115
-#define LE 116
-#define GE 117
-#define EQ 118
-#define COMMA 119
-#define COLON 120
-#define SEMICOLON 121
-#define IF 200
-#define DO 201
+
+#define TOKEN(token_type, number) ((token_type << 8)| (number))
+
+// token types
+#define LEXER  0
+#define OPERATOR  1
+#define KEYWORD  2
+#define ATOM  4
+
+//tokens
+#define EOF_TYPE TOKEN(LEXER, 0)
+#define INDENT TOKEN(LEXER, 1)
+#define DEDENT TOKEN(LEXER, 2)
+#define SEPARATOR TOKEN(LEXER, 3)
+
+#define IDENTIFIER TOKEN(ATOM, 0)
+#define STRING TOKEN(ATOM, 1)
+#define NUMBER TOKEN(ATOM, 2)
+#define CHARACTER TOKEN(ATOM, 3)
+
+#define PLUS TOKEN(OPERATOR, 1)
+#define MINUS TOKEN(OPERATOR, 2)
+#define MULT TOKEN(OPERATOR, 3)
+#define DIV TOKEN(OPERATOR, 4)
+#define IS TOKEN(OPERATOR, 5)
+#define NEQ TOKEN(OPERATOR, 6)
+#define NOT TOKEN(OPERATOR, 7)
+#define LT TOKEN(OPERATOR, 8)
+#define GT TOKEN(OPERATOR, 9)
+#define LE TOKEN(OPERATOR, 10)
+#define GE TOKEN(OPERATOR, 11)
+#define EQ TOKEN(OPERATOR, 12)
+#define LAMBDA TOKEN(OPERATOR, 13)
+
+#define COMMA TOKEN(OPERATOR, 13)
+#define COLON TOKEN(OPERATOR, 14)
+#define SEMICOLON TOKEN(OPERATOR, 15)
+
+#define LPAR TOKEN(OPERATOR, 16)
+#define RPAR TOKEN(OPERATOR, 17)
+#define LBRACKET TOKEN(OPERATOR, 18)
+#define RBRACKET TOKEN(OPERATOR, 19)
+#define LBRACE TOKEN(OPERATOR, 20)
+#define RBRACE TOKEN(OPERATOR, 21)
+
+#define LET TOKEN(KEYWORD, 0)
+#define DO TOKEN(KEYWORD, 1)
+#define IF TOKEN(KEYWORD, 2)
 
 
 typedef struct {
@@ -61,11 +78,16 @@ typedef struct {
     Token *last_token;
 } LexerContext;
 
+
+
 Token *make_token(TokenData *value, char *string, int count);
 void return_token(Token *token);
 LexerContext *get_lexer(char *source);
 
+Token *static_token(int token);
 Token *next_token(LexerContext *ctx);
 void tokenize_file(char *source);
+bool is_operator(Token *token);
+bool is_keyword(Token *token);
 
 #endif

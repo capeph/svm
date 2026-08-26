@@ -1,0 +1,4 @@
+#function def
+let f(x) = x + 1
+#function call
+let g = f(2)

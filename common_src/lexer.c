@@ -17,7 +17,16 @@ TokenData identifier_data = {"IDENTIFIER", IDENTIFIER};
 TokenData indent_data = {"INDENT", INDENT};
 TokenData dedent_data = {"DEDENT", DEDENT};
 TokenData separator_data = {"SEPARATOR", SEPARATOR};
+Token lambda_tok = {"LAMBDA", LAMBDA, "\\", 0};
+Token eof_tok = {"EOF", EOF_TYPE, "", 0};
 
+Token *static_token(int token) {
+    switch(token) {
+        case LAMBDA : return &lambda_tok;
+        case EOF_TYPE : return &eof_tok;
+        default: return NULL;
+    }
+}
 
 bool is_decimal_separator(char ch) {
     return ch == '.';
@@ -183,6 +192,7 @@ Token *get_character(LexerContext *ctx, char *line, int *offset)
 
 
 Token *get_identifier(LexerContext *ctx, char *line, int *offset) {
+//    printf("get_identifier\n");
     int pos = *offset;
     int ident_start = pos;
     while(!(line[pos] == '\0' ||
@@ -197,6 +207,7 @@ Token *get_identifier(LexerContext *ctx, char *line, int *offset) {
         return NULL; // no number found
     }
     char *id = get_str(ctx->str_cache, line, ident_start, pos);
+//    printf("got ident %s\n", id);
     TokenData *keyword = trie_match(ctx->keywords, id);
     *offset = pos;
     if (keyword != NULL) {
@@ -241,9 +252,20 @@ int skip_white_space(LexerContext *ctx, char* line, int *pos) {
     return i;
 }
 
+bool is_operator(Token *token)
+{
+    return token != NULL && (token->token_type & (OPERATOR << 8)) != 0;
+}
+
+bool is_keyword(Token *token)
+{
+    return token != NULL && (token->token_type & (KEYWORD << 8)) != 0;
+}
+
 
 Token *read_token(LexerContext *ctx, char *line, int *pos)
 {
+//    printf("read_token\n");
     skip_white_space(ctx, line, pos);
     char *str = line + *pos;
     int read = 0;
@@ -364,6 +386,7 @@ void setup_keywords(LexerContext *ctx) {
     keywords->data = NULL;
     trie_add(keywords, "if", describe_token("IF", IF));
     trie_add(keywords, "do", describe_token("DO", DO));
+    trie_add(keywords, "let", describe_token("LET", LET));
     ctx->keywords = keywords;
 }
 
@@ -397,7 +420,7 @@ Token *next_token(LexerContext *ctx) {
         newline = false;
         while (ctx->line[ctx->offset] == '\0') {
             if (fgets(ctx->line, LINE_BUFFER_SIZE, ctx->file) == NULL) {
-                ctx->last_token = make_token(&eof_data, "", 1);
+                ctx->last_token = static_token(EOF_TYPE);
 //                printf("eof token\n");
                 return ctx->last_token;
             }
