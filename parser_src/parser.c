@@ -7,6 +7,9 @@
 #include "parser.h"
 
 
+void advance(ParserContext *ctx) {
+    next_token(ctx->lexer);
+}
 
 void clear_node_list(Array *array) {
     if (array != NULL) {
@@ -33,17 +36,27 @@ void clear_ast_node(void *node) {
     }
 }
 
-
-bool is_token(LexerContext *ctx, int token_type) {
-    return ctx->last_token != NULL && ctx->last_token->token_type == token_type;
+Token *last_token(ParserContext *ctx) {
+    return ctx->lexer->last_token;
 }
 
-void error(LexerContext *ctx, char *expected) {
-    if (ctx->last_token == NULL) {
+bool is_null(ParserContext *ctx) {
+    return last_token(ctx) == NULL;
+}
+
+bool is_token(ParserContext *ctx, int token_type) {
+    return !is_null(ctx) && last_token(ctx)->token_type == token_type;
+}
+
+
+
+void error(ParserContext *ctx, char *expected) {
+    if (is_null(ctx)) {
         printf("Error reading tokens\n");
     }
     else {
-        printf("Expecting %s instead of %s(%s)\n", expected, ctx->last_token->name, ctx->last_token->value);
+        Token *last = last_token(ctx);
+        printf("Expecting %s instead of %s(%s)\n", expected, last->name, last->value);
     }
 }
 
@@ -56,10 +69,10 @@ ast_binary_op *construct_binop(void *left_node, Token *op, void *right_node, int
     return node;
 }
 
-ast_binary_op *make_binop(LexerContext *ctx, void *left_node, node_reader right_reader, int node_type, char *expected) {
+ast_binary_op *make_binop(ParserContext *ctx, void *left_node, node_reader right_reader, int node_type, char *expected) {
 //    printf("make_binop\n");
-    Token *op = ctx->last_token;
-    next_token(ctx);
+    Token *op = last_token(ctx);
+    advance(ctx);
     ast_value_node *right_node = right_reader(ctx);
     if (right_node == NULL) {
         error(ctx, expected);
@@ -75,11 +88,13 @@ ast_value_node *build_value(char *value, int node_type) {
     return node;
 }
 
-ast_value_node *make_value(LexerContext *ctx, int token_type, int node_type, char *expected) {
+
+
+ast_value_node *make_value(ParserContext *ctx, int token_type, int node_type, char *expected) {
 //    printf("make_value\n");
     if (is_token(ctx, token_type)) {
-        ast_value_node *node = build_value(ctx->last_token->value, node_type);
-        next_token(ctx);
+        ast_value_node *node = build_value(last_token(ctx)->value, node_type);
+        advance(ctx);
         return node;
     }
     error(ctx, expected);
@@ -88,43 +103,43 @@ ast_value_node *make_value(LexerContext *ctx, int token_type, int node_type, cha
 
 
 
-bool is_addop(LexerContext *ctx) {
+bool is_addop(ParserContext *ctx) {
     return is_token(ctx, PLUS) || is_token(ctx, MINUS);
 }
 
-bool is_prefix_op(LexerContext *ctx) {
+bool is_prefix_op(ParserContext *ctx) {
     return is_token(ctx, PLUS) || is_token(ctx, MINUS) || is_token(ctx, NOT);
 }
 
-bool is_mulop(LexerContext *ctx) {
+bool is_mulop(ParserContext *ctx) {
     return is_token(ctx, MULT) || is_token(ctx, DIV);
 }
 
-ast_value_node *identifier(LexerContext *ctx) {
+ast_value_node *identifier(ParserContext *ctx) {
     return make_value(ctx, IDENTIFIER, IDENTIFIER_NODE, "identifier");
 }
 
-ast_value_node *number(LexerContext *ctx) {
+ast_value_node *number(ParserContext *ctx) {
     return make_value(ctx, NUMBER, NUMBER_NODE, "number");
 }
 
-ast_value_node *string(LexerContext *ctx) {
+ast_value_node *string(ParserContext *ctx) {
     return make_value(ctx, STRING, STRING_NODE, "string");
 }
 
-void *get_type(LexerContext *ctx) {
+void *get_type(ParserContext *ctx) {
         if (!is_token(ctx, COLON)) {
             error(ctx, "COLON");
             return NULL;
         }
-        next_token(ctx);
+        advance(ctx);
         void *type = identifier(ctx);
-        printf("type %s\n", ctx->last_token->value);
+//        printf("type %s\n", ((ast_value_node *)type)->string_value);
         return type;
 }
 
 
-void *parameter_def(LexerContext * ctx) {
+void *parameter_def(ParserContext * ctx) {
     // include type defintions
     void *param = identifier(ctx);
     if (is_token(ctx, COLON)) {
@@ -133,13 +148,13 @@ void *parameter_def(LexerContext * ctx) {
     return param;
 }
 
-bool is_postfix_op(LexerContext *ctx) {
+bool is_postfix_op(ParserContext *ctx) {
     return is_token(ctx, LPAR);
 }
 
-void *base_factor(LexerContext *ctx) {
-    if (is_keyword(ctx->last_token)) {
-        printf("err %s\n", ctx->last_token->name);
+void *base_factor(ParserContext *ctx) {
+    if (is_keyword(last_token(ctx))) {
+        printf("err %s\n", last_token(ctx)->name);
         return syntactic_expression(ctx);
     }
     if (is_token(ctx, IDENTIFIER)) {
@@ -152,10 +167,10 @@ void *base_factor(LexerContext *ctx) {
         return string(ctx);
     }
     else if (is_token(ctx, LPAR)) {
-        next_token(ctx);
+        advance(ctx);
         void *expr = expression(ctx);
         if (is_token(ctx, RPAR)) {
-            next_token(ctx);
+            advance(ctx);
             return expr;
         }
         clear_ast_node(expr);
@@ -168,17 +183,47 @@ void *base_factor(LexerContext *ctx) {
 }
 
 
-Array *node_list(LexerContext *ctx, node_reader element)
+
+Array *expression_list(ParserContext *ctx, node_reader element, int start_token, int end_token)
+{
+    if (!is_token(ctx, start_token))
+    {
+        error(ctx, "start token");
+        return NULL;
+    }
+    advance(ctx);
+    Array *nodes = create_array(16);
+    while (!is_token(ctx, end_token) && !is_token(ctx, EOF_TYPE)) {
+        if (is_null(ctx) ){
+            error(ctx, "bad expression");
+            clear_node_list(nodes);
+            return NULL;
+        }
+        void *exp = element(ctx);
+        if (exp == NULL) {
+            clear_node_list(nodes);
+            return NULL;
+        }
+        add_to_array(nodes, exp);
+        while(is_token(ctx, SEPARATOR)) {
+            advance(ctx);
+        }
+    }
+    advance(ctx);
+    return nodes;
+}
+
+Array *node_list(ParserContext *ctx, node_reader element)
 {
     if (!is_token(ctx, LPAR))
     {
         error(ctx, "LPAR");
         return NULL;
     }
-    next_token(ctx);
+    advance(ctx);
     Array *nodes = create_array(16);
     while (!is_token(ctx, RPAR)) {
-        if (ctx->last_token == NULL || ctx->last_token==EOF_TYPE) {
+        if (is_null(ctx) || last_token(ctx)==EOF_TYPE) {
             error(ctx, "complete parameter list");
             clear_node_list(nodes);
             return NULL;
@@ -190,15 +235,22 @@ Array *node_list(LexerContext *ctx, node_reader element)
         }
         add_to_array(nodes, exp);
         if (is_token(ctx, COMMA)) {
-            next_token(ctx);
+            advance(ctx);
         }
         while(is_token(ctx, SEPARATOR)) {
-            next_token(ctx);
+            advance(ctx);
         }
     }
-    next_token(ctx);
+    advance(ctx);
 
     return nodes;
+}
+
+ast_node_list *construct_node_list(int node_type, Array *node_list) {
+    ast_node_list *multi = malloc(sizeof(ast_node_list));
+    multi->nodes = node_list;
+    multi->ast.node_type = node_type;
+    return multi;
 }
 
 
@@ -211,7 +263,7 @@ ast_multi_op *construct_multi_op(int node_type, void *base, Array *node_list) {
 }
 
 
-void *postfix_factor(LexerContext *ctx) {
+void *postfix_factor(ParserContext *ctx) {
     void *base = base_factor(ctx);
     while (is_postfix_op(ctx)) {
         if (is_token(ctx, LPAR)) {
@@ -231,10 +283,10 @@ void *postfix_factor(LexerContext *ctx) {
 }
 
 
-void *prefix_factor(LexerContext *ctx) {
+void *prefix_factor(ParserContext *ctx) {
     if (is_prefix_op(ctx)) {
-        Token *operator = ctx->last_token;
-        next_token(ctx);
+        Token *operator = last_token(ctx);
+        advance(ctx);
         void *operand = prefix_factor(ctx);
         if (operand == NULL) {
             error(ctx, "operand to prefix operator ");
@@ -250,11 +302,11 @@ void *prefix_factor(LexerContext *ctx) {
 }
 
 
-void *factor(LexerContext *ctx) {
+void *factor(ParserContext *ctx) {
     return prefix_factor(ctx);
 }
 
-void *term(LexerContext *ctx) {
+void *term(ParserContext *ctx) {
 //    printf("term\n");
     void *left = factor(ctx);
     while (is_mulop(ctx)) {
@@ -268,7 +320,7 @@ void *term(LexerContext *ctx) {
 }
 
 
-void *algebraic_expression(LexerContext *ctx) {
+void *algebraic_expression(ParserContext *ctx) {
 //    printf("expression\n");
     void *left = term(ctx);
     while (is_addop(ctx)) {
@@ -282,13 +334,13 @@ void *algebraic_expression(LexerContext *ctx) {
 }
 
 
-ast_binary_op *definition(LexerContext *ctx) {
+ast_binary_op *definition(ParserContext *ctx) {
 //    printf("definition\n");
     if (!(is_token(ctx, LET))) {
         error(ctx, "let");
         return NULL;
     }
-    next_token(ctx);
+    advance(ctx);
     ast_value_node *ident = identifier(ctx);
     if (ident == NULL) {
         error(ctx, "definition name");
@@ -303,8 +355,8 @@ ast_binary_op *definition(LexerContext *ctx) {
         type = get_type(ctx);
     }
     if (is_token(ctx, IS)) {
-        Token *token = ctx->last_token;
-        next_token(ctx);
+        Token *token = last_token(ctx);
+        advance(ctx);
         void *body = expression(ctx);
         if (parameters != NULL) {
             body = construct_multi_op(FUNCTION_DEF, body, parameters);
@@ -316,17 +368,25 @@ ast_binary_op *definition(LexerContext *ctx) {
     return NULL;
 }
 
-void *do_block(LexerContext *ctx) {
+void *do_block(ParserContext *ctx) {
+    if (!is_token(ctx, DO)) {
+        error(ctx, "DO expression");
+        return NULL;
+    }
+    advance(ctx); // consume 'do'
+    if (is_token(ctx, INDENT)) {
+        Array *nodes = expression_list(ctx, expression, INDENT, DEDENT);
+        return construct_node_list(CODE_BLOCK, nodes);
+    }
+    return expression(ctx);
+}
+
+void *if_expression(ParserContext *ctx) {
     return NULL;
 }
 
-void *if_expression(LexerContext *ctx) {
-    return NULL;
-}
-
-void *syntactic_expression(LexerContext *ctx) {
+void *syntactic_expression(ParserContext *ctx) {
     if (is_token(ctx, DO)) {
-        next_token(ctx);
         return do_block(ctx);
     }
     if (is_token(ctx, LET)) {
@@ -340,8 +400,8 @@ void *syntactic_expression(LexerContext *ctx) {
 }
 
 
-void *expression(LexerContext *ctx) {
-    if (is_keyword(ctx->last_token))
+void *expression(ParserContext *ctx) {
+    if (is_keyword(last_token(ctx)))
     {
         return syntactic_expression(ctx);
     }
@@ -353,7 +413,7 @@ void *expression(LexerContext *ctx) {
 
 
 
-ast_multi_op *module(LexerContext *ctx, char *name) {
+ast_multi_op *module(ParserContext *ctx, char *name) {
 
     // replace with generic builder
     ast_multi_op *module = malloc(sizeof(ast_multi_op));
@@ -362,13 +422,13 @@ ast_multi_op *module(LexerContext *ctx, char *name) {
     module->nodes = create_array(16);
     module->base = build_value(name, IDENTIFIER_NODE);
     while (!is_token(ctx, EOF_TYPE)) {
-        if (ctx->last_token == NULL) {
+        if (is_null(ctx)) {
             error(ctx, "definition");
             clear_multi_op(module);
             return NULL;
         }
         if (is_token(ctx, SEPARATOR)) {
-            next_token(ctx);
+            advance(ctx);
 //            printf("got separator, next is %s\n", ctx->last_token->name);
         }
         else {
@@ -406,6 +466,16 @@ void print_multi_op(char *prefix, ast_multi_op *module, char *label, bool revers
     }
 }
 
+void print_node_list(char *prefix, ast_node_list *list, char *label)
+{
+    printf("%s + block(%s)\n", prefix, label);
+    char new_prefix[strlen(prefix) + 3];
+    snprintf(new_prefix, sizeof(new_prefix), "%s | ", prefix);
+    for(int i = 0; i <= list->nodes->last; i++) {
+        print_nodes(new_prefix, get_array(list->nodes, i));
+    }
+}
+
 void print_nodes(char *prefix, void *root) {
     switch (((ast_node *)root)->node_type) {
     case NUMBER_NODE:
@@ -428,6 +498,9 @@ void print_nodes(char *prefix, void *root) {
         break;
     case FUNCTION_CALL:
         print_multi_op(prefix, root, "call", false);
+        break;
+    case CODE_BLOCK:
+        print_node_list(prefix, root, "do");
         break;
     case UNARY_NODE:
         {
@@ -453,12 +526,16 @@ void print_nodes(char *prefix, void *root) {
     }
 }
 
+
+
 void *parse_module(char *name)
 {
     char *fname = resolve_module_file(name);
-    LexerContext *ctx = get_lexer(fname);
 
-    next_token(ctx);
+    ParserContext *ctx = malloc(sizeof(ParserContext));
+    ctx->lexer = get_lexer(fname);
+
+    advance(ctx);
     ast_multi_op *root = module(ctx, name);
     if (root == NULL) {
         printf("Failed to parse\n");
@@ -466,11 +543,11 @@ void *parse_module(char *name)
     }
     print_nodes("", root);
 
-    if (ctx->last_token == NULL) {
+    if (is_null(ctx)) {
         printf("Emtpy module %s\n", name);
     }
-    else if (ctx->last_token->token_type != EOF_TYPE) {
-        printf("Unknown token  %s (%s)", ctx->last_token->name, ctx->last_token->value);
+    else if (last_token(ctx)->token_type != EOF_TYPE) {
+        printf("Unknown token  %s (%s)", last_token(ctx)->name, last_token(ctx)->value);
     }
     return root;
 }

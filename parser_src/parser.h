@@ -16,6 +16,7 @@
 #define UNARY_NODE 11
 #define VARIABLE_NODE 12
 #define INDEX 13
+#define CODE_BLOCK 14
 
 
 typedef struct {
@@ -26,6 +27,11 @@ typedef struct {
     ast_node ast;
     char *string_value;
 } ast_value_node;
+
+typedef struct {
+    ast_node ast;
+    Array *nodes;
+} ast_node_list;
 
 typedef struct {
     ast_node ast;
@@ -47,17 +53,26 @@ typedef struct {
 } ast_unary_op;
 
 
+typedef struct symbol_table {
+    struct symbol_table *parent;
+    void *ast_node;
+    HashMap *symbols;
+} symbol_table;
 
-typedef void *(*node_reader)(LexerContext *);
+typedef struct {
+    LexerContext *lexer;
+} ParserContext;
+
+typedef void *(*node_reader)(ParserContext *);
 
 void clear_ast_node(void *node);
 
-void *factor(LexerContext *ctx);
-void *term(LexerContext *ctx);
+void *factor(ParserContext *ctx);
+void *term(ParserContext *ctx);
 
-void *syntactic_expression(LexerContext *ctx) ;
-void *algebraic_expression(LexerContext *ctx);
-void *expression(LexerContext *ctx);
+void *syntactic_expression(ParserContext *ctx) ;
+void *algebraic_expression(ParserContext *ctx);
+void *expression(ParserContext *ctx);
 
 void *parse_module(char *name);
 

@@ -1,4 +1,7 @@
 #function def
 let f(x:int,y:int):int = x + y
 #function call
-let g:int = f(2,1)
+let g:int = do
+   let v = f(2, 1)
+   f(2,v)
+#end
