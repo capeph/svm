@@ -7,6 +7,14 @@
 #include "parser.h"
 
 
+char *pop_scope(ParserContext *ctx) {
+    return remove_from_array(ctx->scope, ctx->scope->last);
+}
+
+void push_scope(ParserContext *ctx, char *name) {
+    add_to_array(ctx->scope, name);
+}
+
 void advance(ParserContext *ctx) {
     next_token(ctx->lexer);
 }
@@ -360,7 +368,6 @@ ast_binary_op *definition(ParserContext *ctx) {
         void *body = expression(ctx);
         if (parameters != NULL) {
             body = construct_multi_op(FUNCTION_DEF, body, parameters);
-//            token = static_token(LAMBDA);
         }
         return construct_binop(ident, token, body, BINARY_NODE);
     }
@@ -381,7 +388,15 @@ void *do_block(ParserContext *ctx) {
     return expression(ctx);
 }
 
+
+// if expr then expr else expr
 void *if_expression(ParserContext *ctx) {
+    if (!is_token(ctx, IF)) {
+        error(ctx, "IF expression");
+        return NULL;
+    }
+
+
     return NULL;
 }
 
@@ -527,27 +542,31 @@ void print_nodes(char *prefix, void *root) {
 }
 
 
-
-void *parse_module(char *name)
+ParserContext *parse_module(char *name)
 {
+    char *module_name="test";  //TODO: change this
     char *fname = resolve_module_file(name);
 
     ParserContext *ctx = malloc(sizeof(ParserContext));
     ctx->lexer = get_lexer(fname);
-
+    ctx->symbol_root = malloc(sizeof(symbol_table));
     advance(ctx);
-    ast_multi_op *root = module(ctx, name);
-    if (root == NULL) {
+    push_scope(ctx, module_name);
+    ctx->ast_root = module(ctx, module_name);
+    pop_scope(ctx);
+    ctx->scope = create_array(8);
+
+    if (ctx->ast_root == NULL) {
         printf("Failed to parse\n");
         return NULL;
     }
-    print_nodes("", root);
+    print_nodes("", ctx->ast_root);
 
     if (is_null(ctx)) {
-        printf("Emtpy module %s\n", name);
+        printf("Emtpy module %s\n", module_name);
     }
     else if (last_token(ctx)->token_type != EOF_TYPE) {
         printf("Unknown token  %s (%s)", last_token(ctx)->name, last_token(ctx)->value);
     }
-    return root;
+    return ctx;
 }

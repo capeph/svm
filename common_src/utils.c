@@ -224,8 +224,6 @@ bool trie_has_string(TrieNode *root, char*str) {
     return trie_match_internal(root, str, 0) != NULL;
 }
 
-
-
 void print_trie(TrieNode *root, char *(*printer)(void *)) {
     char *tokenName = printer(root->data);
     printf("node(%c, %s) ", root->value, tokenName);
@@ -258,6 +256,20 @@ void add_to_array(Array *list, void *data) {
     }
     list->last++;
     *(list->data + list->last) = data;
+}
+
+void *remove_from_array(Array *list, int position) {
+    if (position > list->last) {
+        return NULL;
+    }
+    if (position == list->last) {
+        list->last--;
+        return *(list->data + list->last + 1);
+    }
+    void *result = *(list->data + position);
+    memcpy(*(list->data + position), *(list->data + position + 1), sizeof(void *) *(list->last - position));
+    list->last--;
+    return result;
 }
 
 int get_array_size(Array *list) {

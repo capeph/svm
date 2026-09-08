@@ -58,6 +58,7 @@ void print_trie(TrieNode *root, char *(*printer)(void *));
 bool trie_start_char(TrieNode *node, char ch);
 Array *create_array(int initial_size);
 void add_to_array(Array *array, void *data);
+void *remove_from_array(Array *list, int position);
 int get_array_size(Array *array);
 void *get_array(Array * array, int idx);
 

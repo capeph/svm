@@ -55,12 +55,16 @@ typedef struct {
 
 typedef struct symbol_table {
     struct symbol_table *parent;
+    char *name;
     void *ast_node;
     HashMap *symbols;
 } symbol_table;
 
 typedef struct {
     LexerContext *lexer;
+    void *ast_root;
+    symbol_table *symbol_root;
+    Array *scope;
 } ParserContext;
 
 typedef void *(*node_reader)(ParserContext *);
@@ -74,7 +78,7 @@ void *syntactic_expression(ParserContext *ctx) ;
 void *algebraic_expression(ParserContext *ctx);
 void *expression(ParserContext *ctx);
 
-void *parse_module(char *name);
+ParserContext *parse_module(char *name);
 
 void print_nodes(char *prefix, void *root);
 #endif
