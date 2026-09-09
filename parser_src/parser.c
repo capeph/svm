@@ -429,7 +429,7 @@ void *expression(ParserContext *ctx) {
 
 
 ast_multi_op *module(ParserContext *ctx, char *name) {
-
+    printf("module %s\n", name);
     // replace with generic builder
     ast_multi_op *module = malloc(sizeof(ast_multi_op));
 
@@ -438,7 +438,7 @@ ast_multi_op *module(ParserContext *ctx, char *name) {
     module->base = build_value(name, IDENTIFIER_NODE);
     while (!is_token(ctx, EOF_TYPE)) {
         if (is_null(ctx)) {
-            error(ctx, "definition");
+            error(ctx, "expression");
             clear_multi_op(module);
             return NULL;
         }
@@ -546,10 +546,10 @@ ParserContext *parse_module(char *name)
 {
     char *module_name="test";  //TODO: change this
     char *fname = resolve_module_file(name);
-
     ParserContext *ctx = malloc(sizeof(ParserContext));
     ctx->lexer = get_lexer(fname);
     ctx->symbol_root = malloc(sizeof(symbol_table));
+    ctx->scope = create_array(8);
     advance(ctx);
     push_scope(ctx, module_name);
     ctx->ast_root = module(ctx, module_name);

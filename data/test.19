@@ -1,0 +1,4 @@
+#function def
+let f(x:int,y:int):int = x + y
+#function call
+let g:int = f(g(3+a*(f(x+(2-5*7)))),1)
