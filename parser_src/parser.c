@@ -1,11 +1,18 @@
 #include "lexer.h"
 #include "utils.h"
+#include <_stdio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "parser.h"
 
+int scope_counter=0;
+
+char *unique_scope(char *base) {
+    char *result;
+    asprintf(&result, "$_%s_%d", base, scope_counter++);
+}
 
 char *pop_scope(ParserContext *ctx) {
     return remove_from_array(ctx->scope, ctx->scope->last);
@@ -238,10 +245,14 @@ Array *node_list(ParserContext *ctx, node_reader element)
         }
         void *exp = element(ctx);
         if (exp == NULL) {
+            error(ctx, "element");
             clear_node_list(nodes);
             return NULL;
         }
         add_to_array(nodes, exp);
+        while(is_token(ctx, SEPARATOR)) {
+            advance(ctx);
+        }
         if (is_token(ctx, COMMA)) {
             advance(ctx);
         }
@@ -343,7 +354,7 @@ void *algebraic_expression(ParserContext *ctx) {
 
 
 ast_binary_op *definition(ParserContext *ctx) {
-//    printf("definition\n");
+//    printf("in definition\n");
     if (!(is_token(ctx, LET))) {
         error(ctx, "let");
         return NULL;
@@ -354,6 +365,7 @@ ast_binary_op *definition(ParserContext *ctx) {
         error(ctx, "definition name");
         return NULL;
     }
+    push_scope(ctx, ident->string_value);
     Array *parameters = NULL;
     if (is_token(ctx, LPAR)) {
         parameters = node_list(ctx, parameter_def);
@@ -362,6 +374,7 @@ ast_binary_op *definition(ParserContext *ctx) {
     if (is_token(ctx, COLON)) {
         type = get_type(ctx);
     }
+    void *result;
     if (is_token(ctx, IS)) {
         Token *token = last_token(ctx);
         advance(ctx);
@@ -369,10 +382,14 @@ ast_binary_op *definition(ParserContext *ctx) {
         if (parameters != NULL) {
             body = construct_multi_op(FUNCTION_DEF, body, parameters);
         }
-        return construct_binop(ident, token, body, BINARY_NODE);
+        result = construct_binop(ident, token, body, BINARY_NODE);
     }
-    error(ctx, "definition value");
-    return NULL;
+    else {
+        error(ctx, "definition value");
+        result = NULL;
+    }
+    pop_scope(ctx);
+    return result;
 }
 
 void *do_block(ParserContext *ctx) {
@@ -381,11 +398,17 @@ void *do_block(ParserContext *ctx) {
         return NULL;
     }
     advance(ctx); // consume 'do'
+    void * result;
+    push_scope(ctx, unique_scope("do"));
     if (is_token(ctx, INDENT)) {
         Array *nodes = expression_list(ctx, expression, INDENT, DEDENT);
-        return construct_node_list(CODE_BLOCK, nodes);
+        result = construct_node_list(CODE_BLOCK, nodes);
     }
-    return expression(ctx);
+    else {
+        result = expression(ctx);
+    }
+    pop_scope(ctx);
+    return result;
 }
 
 
@@ -395,12 +418,14 @@ void *if_expression(ParserContext *ctx) {
         error(ctx, "IF expression");
         return NULL;
     }
+    push_scope(ctx, unique_scope("if"));
 
-
+    pop_scope(ctx);
     return NULL;
 }
 
 void *syntactic_expression(ParserContext *ctx) {
+    void *result;
     if (is_token(ctx, DO)) {
         return do_block(ctx);
     }
@@ -426,10 +451,9 @@ void *expression(ParserContext *ctx) {
 }
 
 
-
-
 ast_multi_op *module(ParserContext *ctx, char *name) {
-    printf("module %s\n", name);
+//    printf("module %s\n", name);
+    push_scope(ctx, name);
     // replace with generic builder
     ast_multi_op *module = malloc(sizeof(ast_multi_op));
 
@@ -437,23 +461,30 @@ ast_multi_op *module(ParserContext *ctx, char *name) {
     module->nodes = create_array(16);
     module->base = build_value(name, IDENTIFIER_NODE);
     while (!is_token(ctx, EOF_TYPE)) {
+//        printf("getting expr\n");
         if (is_null(ctx)) {
             error(ctx, "expression");
             clear_multi_op(module);
+            pop_scope(ctx);
             return NULL;
         }
         if (is_token(ctx, SEPARATOR)) {
             advance(ctx);
-//            printf("got separator, next is %s\n", ctx->last_token->name);
+//            printf("got separator, next is %s\n", ctx->lexer->last_token->name);
         }
         else {
+//            printf("got %s reading definition\n", ctx->lexer->last_token->name);
             void *def = definition(ctx);
             if (def == NULL) {
+                error(ctx, "definition");
+                pop_scope(ctx);
                 return NULL;
             }
+//            printf("adding definition\n");
             add_to_array(module->nodes, def);
         }
     }
+    pop_scope(ctx);
     return module;
 }
 
@@ -551,9 +582,7 @@ ParserContext *parse_module(char *name)
     ctx->symbol_root = malloc(sizeof(symbol_table));
     ctx->scope = create_array(8);
     advance(ctx);
-    push_scope(ctx, module_name);
     ctx->ast_root = module(ctx, module_name);
-    pop_scope(ctx);
     ctx->scope = create_array(8);
 
     if (ctx->ast_root == NULL) {
